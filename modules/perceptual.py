@@ -2,18 +2,19 @@ import os
 import torch
 import warnings
 
-from curvature import PixelCurvature
+from .curvature import PixelCurvature
 from utils.params import Params
 
 
 class PerceptualData(Params):
     """
     """
-    default_params = {
-        **Params.default_values,
-        'min_dev' : float('-inf'),
-        'max_dev' : float('inf')
-        }
+    # TODO: figure out what this is used for
+    # default_params = {
+    #     **Params.default_values,
+    #     'min_dev' : float('-inf'),
+    #     'max_dev' : float('inf')
+    #     }
 
     def __init__(self, experiment, params, kwargs_lock=True):
         """
@@ -150,8 +151,7 @@ class PerceptualData(Params):
         # Will be set to None in load_raw_data if file path doesn't exist.
         if self.raw is None: 
             warnings.warn(
-                f"Preprocessing requested for {self.subject}, {self.sequence}, 
-                {self.condition}, but no data were loaded."
+                f"Preprocessing requested for {self.subject}, {self.sequence}, {self.condition}, but no data were loaded."
                 )
             return
 
@@ -170,11 +170,12 @@ class PerceptualData(Params):
 class PerceptualDataNull(PerceptualData, PixelCurvature):
     """
     """
-    default_params = {
-        **PerceptualData.default_params,
-        **PixelCurvature.default_params,
-        add stuff here
-        }
+    # TODO: figure out what to do with that
+    # default_params = {
+    #     **PerceptualData.default_params,
+    #     **PixelCurvature.default_params,
+    #     # TODO: add stuff here
+    #     }
 
     def __init__(self, experiment, pparams, cparams, nparams, kwargs_lock=True):
         PerceptualData.__init__(experiment, pparams)

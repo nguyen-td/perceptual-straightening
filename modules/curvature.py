@@ -5,7 +5,7 @@ import re
 import torch
 import warnings
 
-from ..utils.params import Params
+from utils import Params
 
 
 class Curvature(Params):
@@ -14,10 +14,11 @@ class Curvature(Params):
     points.
     """
 
-    default_params = {
-        **Params.default_params,
-        'norm_order' : 2
-    }
+    # TODO: figure out what to do with this
+    # default_params = {
+    #     **Params.default_params,
+    #     'norm_order' : 2
+    # }
 
     def __init__(self, params, kwargs_lock=True):
         super().__init__(params=params, kwargs_lock=kwargs_lock)
@@ -51,8 +52,9 @@ class Curvature(Params):
         n_points = self.x.shape[0]
         self.pointwise_curvature = torch.empty(n_points)
 
+        # TODO: missing value, replace 0
         for i_point in range(n_points):
-            self.pointwise_curvature[i_point] = something here
+            self.pointwise_curvature[i_point] = 0
         
     def compute_curvature(self):
         self.compute_curvature_pointwise()
@@ -99,8 +101,7 @@ class PixelCurvature(Curvature):
         seq['idx'] = KNOWN_SEQUENCES.get(seq['name'], None)
         if seq['idx'] is None:
             raise KeyError(
-                (f"Sequence name does not match any of the currently recognized 
-                sequences: {list(KNOWN_SEQUENCES.keys())}.")
+                (f"Sequence name does not match any of the currently recognized sequences: {list(KNOWN_SEQUENCES.keys())}.")
             )
 
         # Check for value in cparams and use that if present.
