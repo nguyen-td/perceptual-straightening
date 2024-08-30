@@ -3,22 +3,15 @@ import torch
 import warnings
 
 from .curvature import PixelCurvature
-from utils.params import Params
 
-
-class PerceptualData(Params):
+class ExperimentalData():
     """
+    Load and process raw experimental data. 
     """
-    # TODO: figure out what this is used for
-    # default_params = {
-    #     **Params.default_values,
-    #     'min_dev' : float('-inf'),
-    #     'max_dev' : float('inf')
-    #     }
 
-    def __init__(self, experiment, params, kwargs_lock=True):
+    def __init__(self, experiment, params):
         """
-        Class for loading and preprocessing data for one experiment (defined by
+        Class for loading and processing data for one experiment (defined by
         a subject, sequence, and condition).
         
         Arguments
@@ -28,15 +21,14 @@ class PerceptualData(Params):
             sequence  : {str} Name of sequence (e.g. 'natural_fovea_05_PRAIRIE').
             condition : {str} Name of condition (e.g., 'groundtruth')
         params     : dict whose key-value pairs store the relevant parameters 
-                     for loading and preprocessing data.
+                     for loading and processing data.
         """
         self.subject = experiment[0]        
         self.sequence = experiment[1]                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            
         self.condition = experiment[2]
+        self.params = params
         self.raw = None
-        self.kwargs_lock = kwargs_lock
-        self._set_params(params)
-        self.validate_params()
+        # self.validate_params()
 
     def validate_params(self):
         # TODO
@@ -52,19 +44,17 @@ class PerceptualData(Params):
         """
         if 'load_dir' in self.params.keys():
             if load_dir is not None:
-                warnings.warn(
-                    "Overriding key word value for `load_dir` and using the " 
-                    f"value provided in the params dict: {self.params.load_dir}."
-                )
-            load_dir = self.params.load_dir
+                warnings.warn(f"Overriding key word value for `load_dir` and using the value provided in the params dict: {self.params['load_dir']}.")
+            load_dir = self.params['load_dir']
 
-        data_dir = f'{load_dir}/{self.params.experimenter}'
-        dir_file = f'{data_dir}/{self.sequence}.pt'
-        if os.path.isfile(dir_file): self.raw = torch.load(data_dir)
+        data_dir = f'{load_dir}/{self.params['experimenter']}'
+        # dir_file = f'{data_dir}/{self.sequence}.pt'
+        dir_file = f'{data_dir}/{self.subject}_{self.condition}.pt'
+        if os.path.isfile(dir_file): self.raw = torch.load(dir_file)
         
-    def preprocess(self, keep_raw=False):
+    def process(self, keep_raw=False):
         """
-        Preprocesses data to extract counts of correct and incorrect responses and
+        Processes data to extract counts of correct and incorrect responses and
         compute proportion of correct response trials.
 
         Arguments
@@ -74,10 +64,10 @@ class PerceptualData(Params):
                    'keep_raw' was provided as a key-value pair in params, it 
                    will override what is passed in here.
         """
-        # ---------------------------------------------------------------
+
         def corey_data(raw):
             """
-            Special preprocessing function for Corey's data. `raw` is a modified
+            Special processing function for Corey's data. `raw` is a modified
             copy of `self.raw`. This is an encapsulation of an if-block in the
             original. TODO: write a separate routine to convert data to correct 
             format once and save result.
@@ -91,83 +81,78 @@ class PerceptualData(Params):
 
             return raw
       
-        def count_correct_and_incorrect_responses(self, raw):
+        def count_correct_and_incorrect_responses(self):
             """
-            TODO: Something more descriptive here.
+            Count correct and incorrect responses.
+
+            Inputs:
+            -------
+            raw: (n_trials x n_columns) Torch array
+                Array containing the raw data. The columns have the following meanings:
+                    1. Natural (1) vs. synthetic (2)
+                    2. A frame
+                    3. B frame
+                    4. Size, potentially of the stimulus
+                    5. Unknown
+                    6. What the X frame actually matches (e.g., 1 means it matches A, 2 means it matches B)
+                    7. What the participant reported the X frame matches 
             """
-            # Preallocate. TODO: get rid of n_conds.
-            n_conds, self.n_frames = torch.max(raw[:, 0]), torch.raw(max[:, 1])
-            self.correct, self.incorrect = torch.full(
-                (n_conds, self.n_frames, self.n_frames), 
-                torch.nan
-            )
-            # self.correct, self.incorrect = torch.zeros(
-            #     n_conds, self.n_frames, self.n_frames
-            # )
+            # Preallocate
+            self.n_frames = torch.max(torch.cat((self.raw[:,1], self.raw[:,2]), 0)) 
+            self.correct = torch.zeros(self.n_frames, self.n_frames)
+            self.incorrect = torch.zeros(self.n_frames, self.n_frames)
             
-            (cond, ind_i, ind_j, devi, crct) = (
-                raw[:, 0], 
-                raw[:, 1] - 1, # Indices are from MATLAB
-                raw[:, 2] - 1, # Indices are from MATLAB
-                raw[:, 3], 
-                raw[:, 5] == raw[:, 6]
+            (cond, ind_i, ind_j, stim_size, crct) = (
+                self.raw[:, 0], 
+                self.raw[:, 1] - 1, # Indices are from MATLAB
+                self.raw[:, 2] - 1, # Indices are from MATLAB
+                self.raw[:, 3], 
+                self.raw[:, 5] == self.raw[:, 6]
             )
             
-            # XXX: Olivier wrote here for t = 1, raw:size(2), which seems to
-            # entail iteration over columns rather than rows of raw. But since
-            # it is the rows that seem to correspond to data points, it may be
-            # for t = 1, raw:size(1) is what is needed. Need to double check
-            # interpretation of data structure. Do rows correspond to trials???
-            # Yes. Also, note that diagonals are empty because there are no
-            # trials where A = B, but they will be set to 0.5 below.
-            for i_trial in range(raw.shape[0]):
+            # Note that diagonals are empty because there are no trials where A = B, but they will be set to 0.5 below.
+            for i_trial in range(self.raw.shape[0]):
                 is_within_dev_range = (
-                    self.params.min_dev < devi[i_trial] < self.params.max_dev
+                    self.params['min_deviation'] <= stim_size[i_trial] <= self.params['max_deviation']
                 )
                 has_positive_ind = ind_i[i_trial] > 0 and ind_j[i_trial] > 0
 
                 if is_within_dev_range and has_positive_ind and crct[i_trial]:
-                    self.correct[cond[i_trial]][ind_i[i_trial]][ind_j[i_trial]] += 1
+                    self.correct[ind_i[i_trial].item(), ind_j[i_trial].item()] += 1
                 else:
-                    self.incorrect[cond[i_trial]][ind_i[i_trial]][ind_j[i_trial]] += 1
-
-                # TODO: Check if any off diagonal elements are still nan and
-                # warn if so.
+                    self.incorrect[ind_i[i_trial].item(), ind_j[i_trial].item()] += 1
 
         def complete_data(self):
             """
-            Finish up preprocessing.
+            Finish up processing.
             """
-            # Compute total count (TODO: of trials?) and proportion of trials correct.
-            self.all = torch.clone(self.correct) + self.incorrect
-            zero_trials = (self.all == 0).to(torch.float64)
-            self.p_correct = self.correct / (self.all + zero_trials)
+            # Compute total count and proportion of trials correct.
+            self.total = self.correct + self.incorrect
+            zero_trials = (self.total == 0).to(torch.float64)
+            self.p_correct = self.correct / (self.total + zero_trials)
 
             # For each condition, set diagonal of n_frames x n_frames slice to 0.5.
             # TODO: Check to ensure this operation makes sense.
-            torch.diagonal(self.p_correct, offset=0, dim1=-2, dim2=-1).fill_(0.5)
-        # ---------------------------------------------------------------
+            torch.diagonal(self.p_correct, offset=0).fill_(0.5)
 
         # Will be set to None in load_raw_data if file path doesn't exist.
         if self.raw is None: 
             warnings.warn(
-                f"Preprocessing requested for {self.subject}, {self.sequence}, {self.condition}, but no data were loaded."
+                f"processing requested for {self.subject}, {self.sequence}, {self.condition}, but no data were loaded."
                 )
             return
 
-        # Preprocess data.
-        raw = torch.clone(self.raw)
-        raw[:, 0] = torch.ones(raw.shape[0])
-        if self.params.experimenter == 'corey': raw = corey_data(raw)
-        count_correct_and_incorrect_responses(self, raw)
+        # process data.
+        self.raw[:, 0] = torch.ones(self.raw.shape[0]) # TODO: Why? The first column is necessary for distinguishing between natural and synthetic
+        if self.params['experimenter'] == 'corey': self.raw = corey_data(self.raw)
+        count_correct_and_incorrect_responses(self)
         complete_data(self)
 
         # Unless user requested otherwise, overwrite `raw` to save memory.
-        if 'keep_raw' in self.params.keys(): keep_raw = self.params.keep_raw
         if not keep_raw: self.raw = None
 
 
-class PerceptualDataNull(PerceptualData, PixelCurvature):
+class PerceptualDataNull(ExperimentalData):
     """
     """
     # TODO: figure out what to do with that
@@ -177,12 +162,17 @@ class PerceptualDataNull(PerceptualData, PixelCurvature):
     #     # TODO: add stuff here
     #     }
 
-    def __init__(self, experiment, pparams, cparams, nparams, kwargs_lock=True):
-        PerceptualData.__init__(experiment, pparams)
-        PixelCurvature.__init__(experiment[-2:], cparams)
-        Params.__init__(nparams, kwargs_lock=kwargs_lock)
+    # def __init__(self, experiment, pparams, cparams):
+    #     PerceptualData.__init__(experiment, pparams)
+    #     PixelCurvature.__init__(experiment[-2:], cparams)
+
+    def __init__(self, experiment, pparams, cparams):
+        super().__init__(experiment, pparams)
+        self.experiment = experiment
+        self.cparams = cparams
 
     def compute_pixel_curvature(self):
+        pixel_curvature = PixelCurvature(self.experiment[-2:], self.cparams)
         self.load_sequence()
         self.compute_curvature_pointwise()
 
