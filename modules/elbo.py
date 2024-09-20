@@ -1,22 +1,24 @@
 import numpy as np
 import torch
 from torch import nn
+import scipy
+from pathlib import Path
+
+from utils import project_to_positive_definite
 
 class ELBO(nn.Module):
     """
-    Class for optimizing the ELBO term. Note that the prior will contain global trajectory variables (one value for each variable: d*, c*, a*, l*), 
-    whereas the variational distribution will contain the local trajectory variables, i.e., a set of local variables for each node (or for N-1 or
-    N-2 nodes, respectively: d(t), d(t+1)..., c(t), c(t+1), ..., a(t), a(t+1), ..., l). To match the dimension for computing the KL-divergence term, 
-    the prior will still have the same dimensions but with repeating values. For example, the variational distribution has N-1 values for the local 
-    'd' parameter, the prior distribution has N-1 times the *same*  value for the 'd' parameter.
+    Class for optimizing the ELBO term. Note that the prior will contain global trajectory variables (one value for each variable: d*, c*, a*, l*), whereas the variational distribution will contain the local trajectory variables, i.e., a set of local variables for each node (or for N-1 or N-2 nodes, respectively: d(t), d(t+1)..., c(t), c(t+1), ..., a(t), a(t+1), ..., l). To match the dimension for computing the KL-divergence term, the prior will still have the same dimensions but with repeating values. For example, the variational distribution has N-1 values for the local 'd' parameter, the prior distribution has N-1 times the *same*  value for the 'd' parameter.
 
     Input:
     ------
     N: Scalar
         Number of nodes
+    data_path: String
+        Path where the (simulated) data is stored
     """
     
-    def __init__(self, N):
+    def __init__(self, N, data_path):
         super(ELBO, self).__init__()
         
         # # define small noise variables
@@ -24,6 +26,7 @@ class ELBO(nn.Module):
         # eta = torch.distributions.Normal(torch.tensor([0.0]), torch.tensor([np.pi])) 
 
         self.N = N
+        self.data_path = data_path
 
         # initialize means of the prior
         self.mu_d = nn.Parameter(torch.tensor([0.2]))
@@ -60,16 +63,17 @@ class ELBO(nn.Module):
         # define means and covariances, extend the dimension of mu and sigma to match those of the posterior
         mu_prior = torch.cat((self.mu_d.repeat(self.N - 1), self.mu_c.repeat(self.N - 2), 
                               self.mu_a.repeat((self.N - 2) * (self.N - 1)), self.mu_l))
-        sigma_prior = torch.block_diag(torch.diag(self.sigma_d.repeat(self.N - 1)), torch.diag(self.sigma_c.repeat(self.N - 2)), 
-                                       torch.diag(self.sigma_a.repeat((self.N - 2) * (self.N - 1))), torch.diag(self.sigma_l))
+        sigma_prior = torch.block_diag(torch.diag(self.sigma_d.repeat(self.N - 1)), torch.diag(self.sigma_c.repeat(self.N - 2)), torch.diag(self.sigma_a.repeat((self.N - 2) * (self.N - 1))), torch.diag(self.sigma_l))
 
         # transform matrix into lower-triangular matrix via Cholensky decomposition for approximate posterior
         A = self.A @ self.A.t().conj() # creates a Hermitian positive-definite matrix
-        L, _ = torch.linalg.cholesky_ex(A) 
+        # A = project_to_positive_definite(self.A)
+        # L, _ = torch.linalg.cholesky_ex(A) 
 
         # define Distribution objects for prior and posterior
         prior = torch.distributions.MultivariateNormal(mu_prior, sigma_prior)
-        posterior = torch.distributions.MultivariateNormal(self.mu_posterior, scale_tril=L)
+        # posterior = torch.distributions.MultivariateNormal(self.mu_posterior, scale_tril=L)
+        posterior = torch.distributions.MultivariateNormal(self.mu_posterior, A)
         
         return prior, posterior
 
@@ -96,8 +100,7 @@ class ELBO(nn.Module):
         x: Torch tensor
             Variable to transform
         var: String
-            Denotes which variable to transform, defined for "d" and "l". "c" is not transformed. For "a", the orthogonalization
-            depends on the previous displacement vector and will therefore be computed during the trajectory construction.
+            Denotes which variable to transform, defined for "d" and "l". "c" is not transformed. For "a", the orthogonalization depends on the previous displacement vector and will therefore be computed during the trajectory construction.
 
         Output:
         -------
@@ -129,14 +132,12 @@ class ELBO(nn.Module):
         a: (n_samples x (N - 2) x (N - 1))
             Acceleration (direction of curvature)
         tol: Scalar, default: 1e-6
-            Tolerance for checking the orthogonalization. Analytically, the dot product between two vectors
-            should be 0 if they are orthogonal. We can add a small tolerance to account for numerical errors.
+            Tolerance for checking the orthogonalization. Analytically, the dot product between two vectors should be 0 if they are orthogonal. We can add a small tolerance to account for numerical errors.
 
         Output:
         -------
         x: (n_samples x N x (N - 1)) torch tensor
-            Array corresponding to the inferred perceptual trajectory, where the third dimension corresponds to the number of
-            dimensions. 
+            Array corresponding to the inferred perceptual trajectory, where the third dimension corresponds to the number of dimensions. 
         """
         
         assert d.shape[0] == c.shape[0] == a.shape[0], (
@@ -160,7 +161,7 @@ class ELBO(nn.Module):
                 assert (v_hat[i_sample, t-1, :] @ a_hat_t[i_sample, :]).item() <= tol, ("Failed to orthogonalize a_t")
 
             # compute displacement vectors
-            v_hat[:, t, :] = torch.cos(c[:, t-2].unsqueeze(-1)) * v_hat[:, t-1, :] + torch.sin(c[:, t-2].unsqueeze(-1)) * a_hat_t
+            v_hat[:, t, :] = torch.cos(c[:, t-2].unsqueeze(-1)) * v_hat[:, t-1, :].clone() + torch.sin(c[:, t-2].unsqueeze(-1)) * a_hat_t.clone()
 
         for t in range(1, self.N): 
             # compute perceptual trajectories
@@ -176,12 +177,32 @@ class ELBO(nn.Module):
         -------
         n_samples: Scalar (default: 100)
             Number of trajectories to sample
+
+        Outputs:
+        --------
+        log_ll: Scalar torch tensor 
+            Contains the log likelihood over the entire dataset
+        d: (n_samples x (N - 1)) torch tensor
+            Transformed distance
+        c: (n_samples x (N - 2))
+            Curvature
+        a: (n_samples x (N - 2) x (N - 1))
+            Acceleration (direction of curvature)
+        l: Scalar torch tensor 
+            Lapse rate
         """
 
         # define approximate posterior distribution
-        A = self.A @ self.A.t().conj()
-        L, _ = torch.linalg.cholesky_ex(A) 
-        posterior = torch.distributions.MultivariateNormal(self.mu_posterior, scale_tril=L)
+        eps = 1e-6 # add regularization for numerical stability
+        A = self.A @ self.A.t().conj() + eps * torch.eye(self.A.shape[0])
+        # A = project_to_positive_definite(self.A) + eps * torch.eye(self.A.shape[0])
+        # L, info = torch.linalg.cholesky_ex(A)
+
+        # if info != 0:
+        #     raise ValueError("Cholesky decomposition failed, matrix may not be positive definite.")
+        # assert torch.all(torch.diag(L) > 0), "Cholesky factor has non-positive diagonal entries."
+        # posterior = torch.distributions.MultivariateNormal(self.mu_posterior, scale_tril=L)
+        posterior = torch.distributions.MultivariateNormal(self.mu_posterior, A)
         
         # use reparameterization trick (cf. Kingma and Welling, 2022) to sample from approximate distribution
         z_q = posterior.rsample(sample_shape=(n_samples, )) # shape: n_samples x M
@@ -204,11 +225,51 @@ class ELBO(nn.Module):
         # construct trajectory
         x = self.construct_trajectory(d, c, a)
         
-        # compute likelihood
-        f = torch.distributions.Normal(torch.tensor([0.0]), torch.tensor([1.0])) # cdf of the standard normal
+        # load trial information
+        # (n_trial x n_pairs) matrix of 1 (correct response) and 0 (incorrect response)
+        trial_mat = torch.from_numpy(scipy.io.loadmat(Path(self.data_path) / 'Data.mat')['Data']['resp_mat'][0][0]) 
+        # (n_pairs x 2) matrix with index information for each pair
+        pair_inds = torch.from_numpy(scipy.io.loadmat(Path(self.data_path) / 'ExpParam.mat')['ExpParam']['all_pairs'][0][0]) 
 
-        for ij in range(self.N - 1):
-            dist = torch.linalg.norm(x[:, ij-1, :] - x[:, ij, :], dim=1)
+        n_trials = trial_mat.shape[0]
+        n_pairs = trial_mat.shape[1]
+        n_correct_mat = torch.zeros(n_pairs)
+
+        # create array containing the number of correct responses for each frame pair
+        for i_trial in range(n_pairs):
+            n_correct_mat[i_trial] = torch.sum(trial_mat[:, i_trial])
+
+        # define necessary distributions and functions    
+        normal = torch.distributions.Normal(torch.tensor([0.0]), torch.tensor([1.0])) # cdf of the standard normal
+        p_axb = lambda d: normal.cdf(d / torch.sqrt(torch.tensor([2.0]))) * normal.cdf(d / torch.tensor([2.0])) + normal.cdf(-d / torch.sqrt(torch.tensor([2.0]))) * normal.cdf(-d / torch.tensor([2.0]))
+
+        # compute log likelihood
+        log_ll = torch.zeros(self.N - 1)
+        for ij in range(self.N - 1): 
+            distance = torch.linalg.norm(x[:, ij, :] - x[:, ij+1, :], dim=1)
+            p_ij = (1 - 2 * l) * p_axb(distance) + l
+            bool_ind_pair = (pair_inds == torch.tensor([ij+1, ij+2])).all(dim=1) # matlab starts from 0
+            ind_pair = torch.where(bool_ind_pair)[0]
+
+            binomial = torch.distributions.binomial.Binomial(n_trials, p_ij) 
+            log_ll[ij] = torch.mean(binomial.log_prob(n_correct_mat[ind_pair])) # mean over samples
+
+        return torch.sum(log_ll), d, c, a, l
     
+    def compute_loss(self, log_ll, kl_divergence):
+        """
+        Returns the ELBO function. Returns the negative function because the optimizers minimize.
 
-        return d, c, a, l
+        Inputs:
+        -------
+        log_ll: Scalar torch tensor 
+            Contains the log likelihood over the entire dataset
+        kl: Scalar torch tensor
+            KL-divergence term
+
+        Outputs:
+        --------
+        loss: Scalar torch tensor
+            ELBO loss term
+        """
+        return -(log_ll + kl_divergence)
