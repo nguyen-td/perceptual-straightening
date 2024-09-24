@@ -15,13 +15,15 @@ class ELBO(nn.Module):
     ------
     N: Scalar
         Number of nodes
+    glob_curv: Scalar
+        Simulated average global curvature (in radians), used to initialize the mean of the respective prior distribution
     data_path: String
         Path where the (simulated) data is stored. The following MATLAB structures are loaded:
             Data.mat containing the (n_trial x pairs) 'resp_mat' matrix of 1 (correct response) and 0 (incorrect response)
             ExpParam.mat containing the (n_pairs x 2) 'all_pairs' matrix with index information for each pair
     """
     
-    def __init__(self, N, data_path):
+    def __init__(self, N, data_path, glob_curv=(np.pi / 2)):
         super(ELBO, self).__init__()
 
         self.N = N
@@ -29,13 +31,13 @@ class ELBO(nn.Module):
 
         # initialize means of the prior
         self.mu_d = nn.Parameter(torch.tensor([0.2])) 
-        self.mu_c = nn.Parameter(torch.tensor([np.pi / 2]))
+        self.mu_c = nn.Parameter(torch.tensor([glob_curv]))
         self.mu_a = nn.Parameter(torch.tensor([0.0]), requires_grad=False)
         self.mu_l = nn.Parameter(torch.tensor([0.0]), requires_grad=False)
 
         # initialize (diagonal) covariance matrices of the prior
         self.sigma_d = nn.Parameter(torch.tensor([1.0]))
-        self.sigma_c = nn.Parameter(torch.tensor([1.0])) # seems a bit high?
+        self.sigma_c = nn.Parameter(torch.tensor([1.0])) 
         self.sigma_a = nn.Parameter(torch.tensor([1.0]))
         self.sigma_l = nn.Parameter(torch.tensor([1.0]), requires_grad=False)
 
@@ -44,7 +46,7 @@ class ELBO(nn.Module):
         self.mu_posterior_al = nn.Parameter(torch.randn(M - (N-1) - (N - 2)))
 
         # initialize matrix covariance matrix for the variational posterior 
-        self.A = nn.Parameter(torch.abs(torch.randn(M, M))) # variance cannot be negative
+        self.A = nn.Parameter(torch.abs(torch.randn(M))) # variance cannot be negative
 
     def _make_prior_posterior(self):
         """
@@ -72,7 +74,7 @@ class ELBO(nn.Module):
 
         # ensure that the covariance matrix is positive-definite
         eps = 1e-6 # add regularization for numerical stability
-        A = self.A @ self.A.t().conj() + eps * torch.eye(self.A.shape[0]) # creates positive-definite matrix
+        A = torch.diag(self.A) @ torch.diag(self.A).t().conj() + eps * torch.eye(self.A.shape[0]) # creates positive-definite matrix
 
         mu_posterior = torch.cat((inv_softplus(self.mu_d.repeat(self.N - 1)), 
                                   self.mu_c.repeat(self.N - 2), 
@@ -240,6 +242,7 @@ class ELBO(nn.Module):
         for ij in range(self.N - 1): 
             distance = torch.linalg.norm(x[:, ij, :] - x[:, ij+1, :], dim=1)
             p_ij = (1 - 2 * l) * p_axb(distance) + l
+            p_ij = torch.clamp(p_ij, min=1e-6, max=1.0 - 1e-6) # 0 or 1 would block gradient updates
             bool_ind_pair = (pair_inds == torch.tensor([ij+1, ij+2])).all(dim=1) # matlab starts from 0
             ind_pair = torch.where(bool_ind_pair)[0]
 
