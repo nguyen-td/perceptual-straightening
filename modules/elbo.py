@@ -3,6 +3,7 @@ import torch
 from torch import nn
 import scipy
 from pathlib import Path
+from torchrl.modules.utils import inv_softplus
 
 from utils import project_to_positive_definite
 
@@ -15,36 +16,34 @@ class ELBO(nn.Module):
     N: Scalar
         Number of nodes
     data_path: String
-        Path where the (simulated) data is stored
+        Path where the (simulated) data is stored. The following MATLAB structures are loaded:
+            Data.mat containing the (n_trial x pairs) 'resp_mat' matrix of 1 (correct response) and 0 (incorrect response)
+            ExpParam.mat containing the (n_pairs x 2) 'all_pairs' matrix with index information for each pair
     """
     
     def __init__(self, N, data_path):
         super(ELBO, self).__init__()
-        
-        # # define small noise variables
-        # eps = torch.distributions.Normal(torch.tensor([0.0]), torch.tensor([1.0])) 
-        # eta = torch.distributions.Normal(torch.tensor([0.0]), torch.tensor([np.pi])) 
 
         self.N = N
         self.data_path = data_path
 
         # initialize means of the prior
-        self.mu_d = nn.Parameter(torch.tensor([0.2]))
+        self.mu_d = nn.Parameter(torch.tensor([0.2])) 
         self.mu_c = nn.Parameter(torch.tensor([np.pi / 2]))
         self.mu_a = nn.Parameter(torch.tensor([0.0]), requires_grad=False)
         self.mu_l = nn.Parameter(torch.tensor([0.0]), requires_grad=False)
 
         # initialize (diagonal) covariance matrices of the prior
         self.sigma_d = nn.Parameter(torch.tensor([1.0]))
-        self.sigma_c = nn.Parameter(torch.tensor([1.0]))
+        self.sigma_c = nn.Parameter(torch.tensor([1.0])) # seems a bit high?
         self.sigma_a = nn.Parameter(torch.tensor([1.0]))
         self.sigma_l = nn.Parameter(torch.tensor([1.0]), requires_grad=False)
 
-        # initialize means of the approximate posterior
+        # means of d_t and c_t (local variables) of the variational posterior are parametrized by d* and c* (global)
         M = (N - 1) + (N - 2) + (N - 2) * (N - 1) + 1 # sum over the dimension of each variable (d, c, a, l)
-        self.mu_posterior = nn.Parameter(torch.randn(M)) 
+        self.mu_posterior_al = nn.Parameter(torch.randn(M - (N-1) - (N - 2)))
 
-        # initialize matrix for the lower-triangular of the approximate prior 
+        # initialize matrix covariance matrix for the variational posterior 
         self.A = nn.Parameter(torch.abs(torch.randn(M, M))) # variance cannot be negative
 
     def _make_prior_posterior(self):
@@ -61,19 +60,24 @@ class ELBO(nn.Module):
         
         """
         # define means and covariances, extend the dimension of mu and sigma to match those of the posterior
-        mu_prior = torch.cat((self.mu_d.repeat(self.N - 1), self.mu_c.repeat(self.N - 2), 
-                              self.mu_a.repeat((self.N - 2) * (self.N - 1)), self.mu_l))
-        sigma_prior = torch.block_diag(torch.diag(self.sigma_d.repeat(self.N - 1)), torch.diag(self.sigma_c.repeat(self.N - 2)), torch.diag(self.sigma_a.repeat((self.N - 2) * (self.N - 1))), torch.diag(self.sigma_l))
-
-        # transform matrix into lower-triangular matrix via Cholensky decomposition for approximate posterior
-        A = self.A @ self.A.t().conj() # creates a Hermitian positive-definite matrix
-        # A = project_to_positive_definite(self.A)
-        # L, _ = torch.linalg.cholesky_ex(A) 
-
-        # define Distribution objects for prior and posterior
+        mu_prior = torch.cat((self.mu_d.repeat(self.N - 1), 
+                              self.mu_c.repeat(self.N - 2), 
+                              self.mu_a.repeat((self.N - 2) * (self.N - 1)), 
+                              self.mu_l))
+        sigma_prior = torch.block_diag(torch.diag(self.sigma_d.repeat(self.N - 1)), 
+                                       torch.diag(self.sigma_c.repeat(self.N - 2)), 
+                                       torch.diag(self.sigma_a.repeat((self.N - 2) * (self.N - 1))), 
+                                       torch.diag(self.sigma_l))
         prior = torch.distributions.MultivariateNormal(mu_prior, sigma_prior)
-        # posterior = torch.distributions.MultivariateNormal(self.mu_posterior, scale_tril=L)
-        posterior = torch.distributions.MultivariateNormal(self.mu_posterior, A)
+
+        # ensure that the covariance matrix is positive-definite
+        eps = 1e-6 # add regularization for numerical stability
+        A = self.A @ self.A.t().conj() + eps * torch.eye(self.A.shape[0]) # creates positive-definite matrix
+
+        mu_posterior = torch.cat((inv_softplus(self.mu_d.repeat(self.N - 1)), 
+                                  self.mu_c.repeat(self.N - 2), 
+                                  self.mu_posterior_al))
+        posterior = torch.distributions.MultivariateNormal(mu_posterior, A)
         
         return prior, posterior
 
@@ -188,24 +192,12 @@ class ELBO(nn.Module):
             Curvature
         a: (n_samples x (N - 2) x (N - 1))
             Acceleration (direction of curvature)
-        l: Scalar torch tensor 
-            Lapse rate
         """
 
-        # define approximate posterior distribution
-        eps = 1e-6 # add regularization for numerical stability
-        A = self.A @ self.A.t().conj() + eps * torch.eye(self.A.shape[0])
-        # A = project_to_positive_definite(self.A) + eps * torch.eye(self.A.shape[0])
-        # L, info = torch.linalg.cholesky_ex(A)
-
-        # if info != 0:
-        #     raise ValueError("Cholesky decomposition failed, matrix may not be positive definite.")
-        # assert torch.all(torch.diag(L) > 0), "Cholesky factor has non-positive diagonal entries."
-        # posterior = torch.distributions.MultivariateNormal(self.mu_posterior, scale_tril=L)
-        posterior = torch.distributions.MultivariateNormal(self.mu_posterior, A)
+        _, posterior = self._make_prior_posterior()
         
         # use reparameterization trick (cf. Kingma and Welling, 2022) to sample from approximate distribution
-        z_q = posterior.rsample(sample_shape=(n_samples, )) # shape: n_samples x M
+        z_q = posterior.rsample(sample_shape=(n_samples, )) # shape: (n_samples x M)
 
         # define trajectory variables
         d_size = self.N - 1
@@ -254,7 +246,7 @@ class ELBO(nn.Module):
             binomial = torch.distributions.binomial.Binomial(n_trials, p_ij) 
             log_ll[ij] = torch.mean(binomial.log_prob(n_correct_mat[ind_pair])) # mean over samples
 
-        return torch.sum(log_ll), d, c, a, l
+        return torch.sum(log_ll), d, c, a
     
     def compute_loss(self, log_ll, kl_divergence):
         """
