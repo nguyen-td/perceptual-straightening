@@ -1,2 +1,2 @@
 from .load_sim_data import load_sim_data
-from .linalg import project_to_positive_definite
+from .linalg import project_to_positive_definite, make_positive_definite

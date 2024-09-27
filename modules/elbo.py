@@ -5,7 +5,7 @@ import scipy
 from pathlib import Path
 from torchrl.modules.utils import inv_softplus
 
-from utils import project_to_positive_definite
+from utils import make_positive_definite
 
 class ELBO(nn.Module):
     """
@@ -15,19 +15,22 @@ class ELBO(nn.Module):
     ------
     N: Scalar
         Number of nodes
-    glob_curv: Scalar
-        Simulated average global curvature (in radians), used to initialize the mean of the respective prior distribution
     data_path: String
         Path where the (simulated) data is stored. The following MATLAB structures are loaded:
             Data.mat containing the (n_trial x pairs) 'resp_mat' matrix of 1 (correct response) and 0 (incorrect response)
             ExpParam.mat containing the (n_pairs x 2) 'all_pairs' matrix with index information for each pair
+    eps: Scalar
+        Regularization factor to ensure numerical stability for computing the Cholesky decomposition
+    glob_curv: Scalar
+        Simulated average global curvature (in radians), used to initialize the mean of the respective prior distribution
     """
     
-    def __init__(self, N, data_path, glob_curv=(np.pi / 2)):
+    def __init__(self, N, data_path, eps=1e-6, glob_curv=(np.pi / 2)):
         super(ELBO, self).__init__()
 
         self.N = N
         self.data_path = data_path
+        self.eps = eps
 
         # initialize means of the prior
         self.mu_d = nn.Parameter(torch.tensor([0.2])) 
@@ -61,7 +64,7 @@ class ELBO(nn.Module):
             Posterior distribution q_{phi}(z|x)
         
         """
-        # define means and covariances, extend the dimension of mu and sigma to match those of the posterior
+        # define means and covariances of the prior, extend the dimension of mu and sigma to match those of the posterior
         mu_prior = torch.cat((self.mu_d.repeat(self.N - 1), 
                               self.mu_c.repeat(self.N - 2), 
                               self.mu_a.repeat((self.N - 2) * (self.N - 1)), 
@@ -70,16 +73,15 @@ class ELBO(nn.Module):
                                        torch.diag(self.sigma_c.repeat(self.N - 2)), 
                                        torch.diag(self.sigma_a.repeat((self.N - 2) * (self.N - 1))), 
                                        torch.diag(self.sigma_l))
-        prior = torch.distributions.MultivariateNormal(mu_prior, sigma_prior)
+        _, L_prior = make_positive_definite(sigma_prior, self.eps)
+        prior = torch.distributions.MultivariateNormal(mu_prior, scale_tril=L_prior)
 
-        # ensure that the covariance matrix is positive-definite
-        eps = 1e-6 # add regularization for numerical stability
-        A = torch.diag(self.A) @ torch.diag(self.A).t().conj() + eps * torch.eye(self.A.shape[0]) # creates positive-definite matrix
-
+        # define means and covariances of the posterior
+        _, L_posterior = make_positive_definite(torch.diag(self.A), self.eps)
         mu_posterior = torch.cat((inv_softplus(self.mu_d.repeat(self.N - 1)), 
-                                  self.mu_c.repeat(self.N - 2), 
-                                  self.mu_posterior_al))
-        posterior = torch.distributions.MultivariateNormal(mu_posterior, A)
+                                    self.mu_c.repeat(self.N - 2), 
+                                    self.mu_posterior_al))
+        posterior = torch.distributions.MultivariateNormal(mu_posterior, scale_tril=L_posterior)
         
         return prior, posterior
 
