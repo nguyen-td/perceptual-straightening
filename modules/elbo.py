@@ -4,8 +4,9 @@ from torch import nn
 import scipy
 from pathlib import Path
 from torchrl.modules.utils import inv_softplus
+import torch.distributions as D
 
-from utils import make_positive_definite
+from utils import make_positive_definite, make_positive_definite_batch
 
 class ELBO(nn.Module):
     """
@@ -25,7 +26,7 @@ class ELBO(nn.Module):
         Simulated average global curvature (in radians), used to initialize the mean of the respective prior distribution
     """
     
-    def __init__(self, N, data_path, eps=1e-6, glob_curv=(np.pi / 2)):
+    def __init__(self, N, data_path, eps=1e-6):
         super(ELBO, self).__init__()
 
         self.N = N
@@ -33,23 +34,36 @@ class ELBO(nn.Module):
         self.eps = eps
 
         # initialize means of the prior
-        self.mu_d = nn.Parameter(torch.tensor([0.2])) 
-        self.mu_c = nn.Parameter(torch.tensor([glob_curv]))
-        self.mu_a = nn.Parameter(torch.tensor([0.0]), requires_grad=False)
-        self.mu_l = nn.Parameter(torch.tensor([0.0]), requires_grad=False)
+        self.mu_prior_d = nn.Parameter(torch.tensor([0.2])) 
+        self.mu_prior_c = nn.Parameter(torch.tensor([np.pi/2]))
+        self.mu_prior_a = nn.Parameter(torch.tensor([0.0]), requires_grad=False)
+        self.mu_prior_l = nn.Parameter(torch.tensor([0.0]), requires_grad=False)
 
         # initialize (diagonal) covariance matrices of the prior
-        self.sigma_d = nn.Parameter(torch.tensor([1.0]))
-        self.sigma_c = nn.Parameter(torch.tensor([1.0])) 
-        self.sigma_a = nn.Parameter(torch.tensor([1.0]))
-        self.sigma_l = nn.Parameter(torch.tensor([1.0]), requires_grad=False)
+        self.sigma_prior_d = nn.Parameter(torch.tensor([1.0]))
+        self.sigma_prior_c = nn.Parameter(torch.tensor([1.0])) 
+        self.sigma_prior_a = nn.Parameter(torch.ones(N-1))
+        self.sigma_prior_l = nn.Parameter(torch.tensor([1.0]), requires_grad=False)
 
-        # means of d_t and c_t (local variables) of the variational posterior are parametrized by d* and c* (global)
-        M = (N - 1) + (N - 2) + (N - 2) * (N - 1) + 1 # sum over the dimension of each variable (d, c, a, l)
-        self.mu_posterior_al = nn.Parameter(torch.randn(M - (N-1) - (N - 2)))
+        # # means of d_t and c_t (local variables) of the variational posterior are parametrized by d* and c* (global)
+        # M = (N - 1) + (N - 2) + (N - 2) * (N - 1) + 1 # sum over the dimension of each variable (d, c, a, l)
+        # self.mu_posterior_al = nn.Parameter(torch.randn(M - (N-1) - (N - 2)))
 
-        # initialize matrix covariance matrix for the variational posterior 
-        self.A = nn.Parameter(torch.abs(torch.randn(M))) # variance cannot be negative
+        # # initialize matrix covariance matrix for the variational posterior 
+        # self.A = nn.Parameter(torch.abs(torch.randn(M))) # variance cannot be negative
+
+        # initialize means of (N-1) independent posteriors
+        self.mu_post_d = nn.Parameter(torch.randn(N-1))
+        self.mu_post_c = nn.Parameter(torch.randn(N-1) * (torch.tensor(np.pi / 2)))
+        # self.mu_post_c = self.mu_prior_c.repeat(N-1)
+        self.mu_post_a = nn.Parameter(torch.zeros(N-1, N-1), requires_grad=False)
+        self.mu_post_l = nn.Parameter(torch.zeros(N-1), requires_grad=False)
+
+        # initialize sigmas of (N-1) independent posteriors
+        self.sigma_post_d = nn.Parameter(torch.randn(N-1))
+        self.sigma_post_c = nn.Parameter(torch.randn(N-1))
+        self.sigma_post_a = nn.Parameter(torch.randn(N-1, N-1))
+        self.sigma_post_l = nn.Parameter(torch.ones(N-1), requires_grad=False)
 
     def _make_prior_posterior(self):
         """
@@ -65,23 +79,34 @@ class ELBO(nn.Module):
         
         """
         # define means and covariances of the prior, extend the dimension of mu and sigma to match those of the posterior
-        mu_prior = torch.cat((self.mu_d.repeat(self.N - 1), 
-                              self.mu_c.repeat(self.N - 2), 
-                              self.mu_a.repeat((self.N - 2) * (self.N - 1)), 
-                              self.mu_l))
-        sigma_prior = torch.block_diag(torch.diag(self.sigma_d.repeat(self.N - 1)), 
-                                       torch.diag(self.sigma_c.repeat(self.N - 2)), 
-                                       torch.diag(self.sigma_a.repeat((self.N - 2) * (self.N - 1))), 
-                                       torch.diag(self.sigma_l))
-        _, L_prior = make_positive_definite(sigma_prior, self.eps)
-        prior = torch.distributions.MultivariateNormal(mu_prior, scale_tril=L_prior)
+        # mu_prior = torch.cat((self.mu_d.repeat(self.N - 1), 
+        #                       self.mu_c.repeat(self.N - 2), 
+        #                       self.mu_a.repeat((self.N - 2) * (self.N - 1)), 
+        #                       self.mu_l))
+        # sigma_prior = torch.block_diag(torch.diag(self.sigma_d.repeat(self.N - 1)), 
+        #                                torch.diag(self.sigma_c.repeat(self.N - 2)), 
+        #                                torch.diag(self.sigma_a.repeat((self.N - 2) * (self.N - 1))), 
+        #                                torch.diag(self.sigma_l))
+        # _, L_prior = make_positive_definite(sigma_prior, self.eps)
+        mu_prior = torch.cat((self.mu_prior_d, 
+                              self.mu_prior_c, 
+                              self.mu_prior_a.repeat(self.N-1), 
+                              self.mu_prior_l), 0)
+        _, L_prior = make_positive_definite(torch.diag(torch.cat((self.sigma_prior_d, 
+                                                                  self.sigma_prior_c, 
+                                                                  self.sigma_prior_a, 
+                                                                  self.sigma_prior_l), 0)), self.eps)
+        prior = D.MultivariateNormal(mu_prior, scale_tril=L_prior)
 
         # define means and covariances of the posterior
-        _, L_posterior = make_positive_definite(torch.diag(self.A), self.eps)
-        mu_posterior = torch.cat((inv_softplus(self.mu_d.repeat(self.N - 1)), 
-                                    self.mu_c.repeat(self.N - 2), 
-                                    self.mu_posterior_al))
-        posterior = torch.distributions.MultivariateNormal(mu_posterior, scale_tril=L_posterior)
+        # _, L_posterior = make_positive_definite(torch.diag(self.A), self.eps)
+        # mu_posterior = torch.cat((inv_softplus(self.mu_d.repeat(self.N - 1)), 
+        #                             self.mu_c.repeat(self.N - 2), 
+        #                             self.mu_posterior_al))
+        mu_post = torch.vstack((self.mu_post_d, self.mu_post_c, self.mu_post_a, self.mu_post_l)).T
+        sigma_post = torch.diag_embed(torch.vstack((self.sigma_post_d, self.sigma_post_c, self.sigma_post_a, self.sigma_post_l)).T)
+        _, L_post = make_positive_definite_batch(sigma_post, self.eps)
+        posterior = D.MultivariateNormal(mu_post, scale_tril=L_post)
         
         return prior, posterior
 
@@ -96,7 +121,8 @@ class ELBO(nn.Module):
         """
 
         prior, posterior = self._make_prior_posterior()
-        kl = torch.distributions.kl.kl_divergence(posterior, prior)
+        # kl = torch.distributions.kl.kl_divergence(posterior, prior)
+        kl = torch.sum(D.kl_divergence(posterior, prior))
         return kl
 
     def _transform(self, x, var):
@@ -201,17 +227,21 @@ class ELBO(nn.Module):
         _, posterior = self._make_prior_posterior()
         
         # use reparameterization trick (cf. Kingma and Welling, 2022) to sample from approximate distribution
-        z_q = posterior.rsample(sample_shape=(n_samples, )) # shape: (n_samples x M)
+        z_q = posterior.rsample(sample_shape=(n_samples, )) # shape: (n_samples x (N-1) x (3 + N - 1))
 
-        # define trajectory variables
-        d_size = self.N - 1
-        c_size = self.N - 2
-        a_size = (self.N - 1) * (self.N - 2)
+        # # define trajectory variables
+        # d_size = self.N - 1
+        # c_size = self.N - 2
+        # a_size = (self.N - 1) * (self.N - 2)
 
-        d = z_q[:, :d_size]
-        c = z_q[:, d_size:d_size + c_size]
-        a = z_q[:, d_size + c_size:d_size + c_size + a_size].reshape(-1, self.N - 2, self.N - 1)
-        l = z_q[:, -1]
+        # d = z_q[:, :d_size]
+        # c = z_q[:, d_size:d_size + c_size]
+        # a = z_q[:, d_size + c_size:d_size + c_size + a_size].reshape(-1, self.N - 2, self.N - 1)
+        # l = z_q[:, -1]
+        d = z_q[:, :, 0]     # t = 1, ..., T
+        c = z_q[:, 1:, 1]    # t = 2, ..., T
+        a = z_q[:, 1:, 2:-1] # t = 2, ..., T
+        l = torch.mean(z_q[:, :, -1])
 
         # transform variables (note: a is not transformed here yet because it depends on previous displacement vector; 
         # will be transformed during trajectory generation)
