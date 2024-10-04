@@ -6,7 +6,7 @@ from pathlib import Path
 from torchrl.modules.utils import inv_softplus
 import torch.distributions as D
 
-from utils import make_positive_definite, make_positive_definite_batch
+from utils import make_positive_definite, make_positive_definite_batch, log_likelihood
 
 class ELBO(nn.Module):
     """
@@ -54,16 +54,23 @@ class ELBO(nn.Module):
 
         # initialize means of (N-1) independent posteriors
         self.mu_post_d = nn.Parameter(torch.randn(N-1))
-        self.mu_post_c = nn.Parameter(torch.randn(N-1) * (torch.tensor(np.pi / 2)))
-        # self.mu_post_c = self.mu_prior_c.repeat(N-1)
+        self.mu_post_c = nn.Parameter(torch.randn(N-1) * torch.pi)
         self.mu_post_a = nn.Parameter(torch.zeros(N-1, N-1), requires_grad=False)
         self.mu_post_l = nn.Parameter(torch.zeros(N-1), requires_grad=False)
+        # self.mu_post_d = self.mu_prior_d.repeat(N-1)
+        # self.mu_post_c = self.mu_prior_c.repeat(N-1)
+        # self.mu_post_a = self.mu_prior_a.repeat((N-1, N-1))
+        # self.mu_post_l = self.mu_prior_l.repeat(N-1)
 
         # initialize sigmas of (N-1) independent posteriors
         self.sigma_post_d = nn.Parameter(torch.randn(N-1))
         self.sigma_post_c = nn.Parameter(torch.randn(N-1))
         self.sigma_post_a = nn.Parameter(torch.randn(N-1, N-1))
         self.sigma_post_l = nn.Parameter(torch.ones(N-1), requires_grad=False)
+        # self.sigma_post_d = self.sigma_prior_d.repeat(N-1)
+        # self.sigma_post_c = self.sigma_prior_c.repeat(N-1)
+        # self.sigma_post_a = torch.tile(self.sigma_prior_a, (10, 1))
+        # self.sigma_post_l = self.sigma_prior_l.repeat(N-1)
 
     def _make_prior_posterior(self):
         """
@@ -247,6 +254,7 @@ class ELBO(nn.Module):
         # will be transformed during trajectory generation)
         d = self._transform(d, 'd')
         l = self._transform(l, 'l')
+        # c = torch.abs(c)
 
         # construct trajectory
         x = self.construct_trajectory(d, c, a)
@@ -257,29 +265,7 @@ class ELBO(nn.Module):
         # (n_pairs x 2) matrix with index information for each pair
         pair_inds = torch.from_numpy(scipy.io.loadmat(Path(self.data_path) / 'ExpParam.mat')['ExpParam']['all_pairs'][0][0]) 
 
-        n_trials = trial_mat.shape[0]
-        n_pairs = trial_mat.shape[1]
-        n_correct_mat = torch.zeros(n_pairs)
-
-        # create array containing the number of correct responses for each frame pair
-        for i_trial in range(n_pairs):
-            n_correct_mat[i_trial] = torch.sum(trial_mat[:, i_trial])
-
-        # define necessary distributions and functions    
-        normal = torch.distributions.Normal(torch.tensor([0.0]), torch.tensor([1.0])) # cdf of the standard normal
-        p_axb = lambda d: normal.cdf(d / torch.sqrt(torch.tensor([2.0]))) * normal.cdf(d / torch.tensor([2.0])) + normal.cdf(-d / torch.sqrt(torch.tensor([2.0]))) * normal.cdf(-d / torch.tensor([2.0]))
-
-        # compute log likelihood
-        log_ll = torch.zeros(self.N - 1)
-        for ij in range(self.N - 1): 
-            distance = torch.linalg.norm(x[:, ij, :] - x[:, ij+1, :], dim=1)
-            p_ij = (1 - 2 * l) * p_axb(distance) + l
-            p_ij = torch.clamp(p_ij, min=1e-6, max=1.0 - 1e-6) # 0 or 1 would block gradient updates
-            bool_ind_pair = (pair_inds == torch.tensor([ij+1, ij+2])).all(dim=1) # matlab starts from 0
-            ind_pair = torch.where(bool_ind_pair)[0]
-
-            binomial = torch.distributions.binomial.Binomial(n_trials, p_ij) 
-            log_ll[ij] = torch.mean(binomial.log_prob(n_correct_mat[ind_pair])) # mean over samples
+        log_ll = log_likelihood(self.N, trial_mat, pair_inds, x, l)
 
         return torch.sum(log_ll), d, c, a
     
@@ -299,4 +285,4 @@ class ELBO(nn.Module):
         loss: Scalar torch tensor
             ELBO loss term
         """
-        return -(log_ll + kl_divergence)
+        return -(log_ll - kl_divergence)
