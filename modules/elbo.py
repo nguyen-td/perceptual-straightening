@@ -16,21 +16,14 @@ class ELBO(nn.Module):
     ------
     N: Scalar
         Number of nodes
-    data_path: String
-        Path where the (simulated) data is stored. The following MATLAB structures are loaded:
-            Data.mat containing the (n_trial x pairs) 'resp_mat' matrix of 1 (correct response) and 0 (incorrect response)
-            ExpParam.mat containing the (n_pairs x 2) 'all_pairs' matrix with index information for each pair
-    eps: Scalar
+    eps: Scalar (default: 1e-6)
         Regularization factor to ensure numerical stability for computing the Cholesky decomposition
-    glob_curv: Scalar
-        Simulated average global curvature (in radians), used to initialize the mean of the respective prior distribution
     """
     
-    def __init__(self, N, data_path, eps=1e-6):
+    def __init__(self, N, eps=1e-6):
         super(ELBO, self).__init__()
 
         self.N = N
-        self.data_path = data_path
         self.eps = eps
 
         # initialize means of the prior
@@ -54,7 +47,7 @@ class ELBO(nn.Module):
 
         # initialize means of (N-1) independent posteriors
         self.mu_post_d = nn.Parameter(torch.randn(N-1))
-        self.mu_post_c = nn.Parameter(torch.randn(N-1) * torch.pi)
+        self.mu_post_c = nn.Parameter(torch.rand(N-1) * torch.pi)
         self.mu_post_a = nn.Parameter(torch.zeros(N-1, N-1), requires_grad=False)
         self.mu_post_l = nn.Parameter(torch.zeros(N-1), requires_grad=False)
         # self.mu_post_d = self.mu_prior_d.repeat(N-1)
@@ -148,6 +141,22 @@ class ELBO(nn.Module):
         x_trans: Torch tensor
             Transformed variable
         """
+
+        def smooth_step_function(x, epsilon=1e-3):    
+            """
+            Differentiable approximation of the following piecewise function: 
+            
+            f(x) = {0 if x < 0
+                    pi if x >= pi
+                    x otherwise
+                    }
+            """
+            s1 = torch.sigmoid(x / epsilon)  # Approximates the step at x=0
+            s2 = torch.sigmoid((torch.pi - x) / epsilon)  # Approximates the step at x=pi
+            
+            # Interpolating between the different regions
+            result = s1 * x * s2 + torch.pi * (1 - s2)
+            return result
     
         if var == 'd':
             f = nn.Softplus()
@@ -155,6 +164,8 @@ class ELBO(nn.Module):
         elif var == 'l':
             f = torch.distributions.Normal(torch.tensor([0.0]), torch.tensor([1.0])) 
             y = 0.06 * f.cdf(x)
+        elif var == 'c':
+            y = smooth_step_function(x)
         else:
             raise Exception("Unrecognized value for `var`.")
 
@@ -210,12 +221,16 @@ class ELBO(nn.Module):
         
         return x
 
-    def compute_likelihood(self, n_samples=100):
+    def compute_likelihood(self, trial_mat, pair_inds, n_samples=100):
         """
         Compute the expected likelihood w.r.t. the posterior (first term of the objective function. Involves the computation of the trajectory.
 
         Inputs:
         -------
+        trial_mat: (n_trial x n_pairs) torch tensor
+            Trial matrix of 1 (correct responses) and 0 (incorrect responses)
+        pair_inds: (n_pairs x 2) torch tensor
+            Matrix with index information for each pair
         n_samples: Scalar (default: 100)
             Number of trajectories to sample
 
@@ -236,15 +251,7 @@ class ELBO(nn.Module):
         # use reparameterization trick (cf. Kingma and Welling, 2022) to sample from approximate distribution
         z_q = posterior.rsample(sample_shape=(n_samples, )) # shape: (n_samples x (N-1) x (3 + N - 1))
 
-        # # define trajectory variables
-        # d_size = self.N - 1
-        # c_size = self.N - 2
-        # a_size = (self.N - 1) * (self.N - 2)
-
-        # d = z_q[:, :d_size]
-        # c = z_q[:, d_size:d_size + c_size]
-        # a = z_q[:, d_size + c_size:d_size + c_size + a_size].reshape(-1, self.N - 2, self.N - 1)
-        # l = z_q[:, -1]
+        # extract variables
         d = z_q[:, :, 0]     # t = 1, ..., T
         c = z_q[:, 1:, 1]    # t = 2, ..., T
         a = z_q[:, 1:, 2:-1] # t = 2, ..., T
@@ -254,17 +261,10 @@ class ELBO(nn.Module):
         # will be transformed during trajectory generation)
         d = self._transform(d, 'd')
         l = self._transform(l, 'l')
-        # c = torch.abs(c)
+        c = self._transform(c, 'c')
 
         # construct trajectory
         x = self.construct_trajectory(d, c, a)
-        
-        # load trial information
-        # (n_trial x n_pairs) matrix of 1 (correct response) and 0 (incorrect response)
-        trial_mat = torch.from_numpy(scipy.io.loadmat(Path(self.data_path) / 'Data.mat')['Data']['resp_mat'][0][0]) 
-        # (n_pairs x 2) matrix with index information for each pair
-        pair_inds = torch.from_numpy(scipy.io.loadmat(Path(self.data_path) / 'ExpParam.mat')['ExpParam']['all_pairs'][0][0]) 
-
         log_ll = log_likelihood(self.N, trial_mat, pair_inds, x, l)
 
         return torch.sum(log_ll), d, c, a

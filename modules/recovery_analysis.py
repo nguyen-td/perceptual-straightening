@@ -23,25 +23,33 @@ def compute_curvature(x, N):
 
     Outputs:
     --------
-    c: (N) numpy array
+    c: (N-2) torch tensor 
         Inferred average curvature
+    a: (N-2, N-1) torch tensor
+        Acceleration
+    d: (N-1) torch tensor
+        Distances/length of displacement vector
     """
 
     v_hat = torch.zeros(N-1, N-1) # first index is T, second index is the number of dimensions
     c = torch.zeros(N-2)
+    a = torch.zeros(N-2, N-1)
+    d = torch.zeros(N-1)
     
     for t in range(1, N):
         v = x.squeeze()[t] - x.squeeze()[t-1]
         v_hat[t-1] = v / torch.linalg.norm(v)
+        d[t-1] = torch.linalg.norm(v)
     
     for t in range(1, N-1):
         c[t-1] = torch.arccos(v_hat[t-1] @ v_hat[t])
+        a[t-1] = (v_hat[t] - torch.cos(c[t-1] * v_hat[t-1])) / torch.sin(c[t])
 
-    return c
+    return c, a, d
 
-def direct_estimation(sim_dir, n_traj, n_frames=4, n_dim=3, n_iterations=1000):
+def direct_estimation(sim_dir, n_traj, n_frames=4, n_dim=3, n_iterations=1000, sim_curvature=None):
     """
-    Two-step greedy curvature estimation using maximum likelihood estimation, where L(n,m | x) is the likelihood function.
+    Two-step greedy curvature estimation using maximum likelihood estimation for recovery analysis, where L(n,m | x) is the likelihood function. The ground truth curvatures are generated randomly. 
 
     Inputs:
     -------
@@ -55,6 +63,8 @@ def direct_estimation(sim_dir, n_traj, n_frames=4, n_dim=3, n_iterations=1000):
         Number of dimensions
     n_iterations: Scalar
         Number of iterations
+    sim_curvature: Scalar (degrees) or None (default: None)
+        Simulated curvature in degrees. If None is passed, then the curvatures are randomly sampled.
 
     Outputs:
     --------
@@ -62,13 +72,25 @@ def direct_estimation(sim_dir, n_traj, n_frames=4, n_dim=3, n_iterations=1000):
         Estimated average curvatures for each simulated trajectory
     c_true: (n_traj, ) torch tensor
         Ground truth curvatures (angles) for each simulated trajectory
+    c: (n_traj, N-2) torch tensor
+        Estimated curvature for each simulated trajectory
+    a: (n_traj, N-2) torch tensor
+        Acceleration
+    d: (n_traj, N-1) torch tensor
+        Distances/length of displacement vector
     """
 
     os.chdir(sim_dir)
     # call MATLAB function to create trajectory
 
     c_est = torch.zeros(n_traj)
-    c_true = (torch.rand(n_traj) * (torch.pi)) * (180 / torch.pi) # in degrees
+    if not isinstance(sim_curvature, (int, float)):
+        c_true = (torch.rand(n_traj) * (torch.pi)) * (180 / torch.pi) # in degrees
+    else:
+        c_true = torch.zeros(n_traj) + sim_curvature 
+    c = torch.zeros(n_traj, N-2)
+    a = torch.zeros(n_traj, N-2, N-1)
+    d = torch.zeros(n_traj, N-1)
 
     for i_traj in range(n_traj):
         eng = matlab.engine.start_matlab()
@@ -91,9 +113,8 @@ def direct_estimation(sim_dir, n_traj, n_frames=4, n_dim=3, n_iterations=1000):
         optimizer = torch.optim.SGD([{'params': x}], lr=lr)
 
         # run optimization
-        iterations = n_iterations
-        loss = np.zeros(iterations)
-        for i in range(iterations):
+        loss = np.zeros(n_iterations)
+        for i in range(n_iterations):
             log_ll = -torch.sum(log_likelihood(N, trial_mat, pair_inds, x, l))
 
             # gradient update
@@ -101,15 +122,95 @@ def direct_estimation(sim_dir, n_traj, n_frames=4, n_dim=3, n_iterations=1000):
             optimizer.step()
             optimizer.zero_grad()
 
-            # save error
-            loss[i] = log_ll.item()
+            ## save error
+            # loss[i] = log_ll.item()
 
             # if not i % 50:
             #     print(f"Epoch: {i}, Loss: {loss[i]}")
         
-        c_est[i_traj] = torch.mean(compute_curvature(x, N)) * (180 / torch.pi)
+        c[i_traj], a[i_traj], d[i_traj] = compute_curvature(x, N)
+        c_est[i_traj] = torch.mean(c[i_traj])
+
+        if not i_traj % 10:
+            print(f"Iteration: {i_traj}")
+
+    c_est = c_est * (180 / torch.pi)
+    c = c * (180 / torch.pi)
+    return c_est, c_true, c, a, d
+
+def curvature_estimation(sim_dir, n_traj, n_frames, n_dim, n_iterations=1000, eps=1e-6, lr=1e-4, sim_curvature=None):
+    """
+    Run the curvature estimation for recovery analysis. The ground truth curvatures are generated randomly. 
+
+    Inputs:
+    -------
+    sim_dir: String
+        String containing the path were the MATLAB simulation_py.mat script is located
+    n_traj: Scalar
+        Number of simulated trajectories
+    n_frames: Scalar
+        Number of frames
+    n_dim: Scalar
+        Number of dimensions
+    n_iterations: Scalar
+        Number of iterations
+    eps: Scalar (default: 1e-6)
+        Regularization factor to ensure numerical stability for computing the Cholesky decomposition
+    lr: Scalar (default: 1e-4)
+        Learning rate of the optimizer
+    sim_curvature: Scalar (degrees) or None (default: None)
+        Simulated curvature in degrees. If None is passed, then the curvatures are randomly sampled.
+
+    Outputs:
+    --------
+    c_est: (n_traj, ) torch tensor
+        Estimated average curvatures for each simulated trajectory
+    c_true: (n_traj, ) torch tensor
+        Ground truth curvatures (angles) for each simulated trajectory
+    """
+
+    os.chdir(sim_dir)
+    # call MATLAB function to create trajectory
+
+    c_est = torch.zeros(n_traj)
+    if not isinstance(sim_curvature, (int, float)):
+        c_true = (torch.rand(n_traj) * (torch.pi)) * (180 / torch.pi) # in degrees
+    else:
+        c_true = torch.zeros(n_traj) + sim_curvature 
+
+    for i_traj in range(n_traj):
+        # load data
+        eng = matlab.engine.start_matlab()
+        ExpParam, Data, _ = eng.simulation_py(c_true[i_traj].item(), n_frames, n_dim, nargout=3)
+
+        # stop MATLAB engine
+        eng.quit()
+
+        # extract data matrices
+        trial_mat = torch.tensor(Data['resp_mat'])
+        pair_inds = torch.tensor(ExpParam['all_pairs'])
+
+        # initialize model
+        model = ELBO(n_frames, eps)
+
+        # set up optimizer
+        optimizer = torch.optim.SGD(model.parameters(), lr=lr)
+
+        # optimize ELBO
+        for i in range(n_iterations):
+            log_ll, d, c, a = model.compute_likelihood(trial_mat, pair_inds)
+            kl = model.kl_divergence()
+            loss = model.compute_loss(log_ll, kl)
+
+            # gradient update
+            loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
+
+        c_est[i_traj] = torch.mean(c).detach().numpy() * (180/np.pi)
 
         if not i_traj % 10:
             print(f"Iteration: {i_traj}")
 
     return c_est, c_true
+
