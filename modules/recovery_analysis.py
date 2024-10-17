@@ -47,7 +47,7 @@ def compute_curvature(x, N):
 
     return c, d, a
 
-def direct_estimation(sim_dir, n_traj, n_frames=4, n_dim=3, n_iterations=1000, sim_curvature=None, isdegree=False):
+def direct_estimation(sim_dir, n_traj, n_frames=4, n_dim=3, n_iterations=1000, n_trials=1000, sim_curvature=None, isdegree=False):
     """
     Two-step greedy curvature estimation using maximum likelihood estimation for recovery analysis, where L(n,m | x) is the likelihood function. The ground truth curvatures are generated randomly. 
 
@@ -63,6 +63,8 @@ def direct_estimation(sim_dir, n_traj, n_frames=4, n_dim=3, n_iterations=1000, s
         Number of dimensions
     n_iterations: Scalar
         Number of iterations
+    n_trials: Scalar
+        Number of trials
     sim_curvature: Scalar (degrees) or None (default: None)
         Simulated curvature in degrees. If None is passed, then the curvatures are randomly sampled.
     isdegree: Boolean (default: False)
@@ -80,6 +82,10 @@ def direct_estimation(sim_dir, n_traj, n_frames=4, n_dim=3, n_iterations=1000, s
         Distances/length of displacement vector
     a: (n_traj, N-2, N-2) torch tensor
         Acceleration
+    ExpParam: Dictionary
+        Contains experimental parameters
+    Data: Dictionary
+        Contains the trial matrix with correct (1) and incorrect (0) responses
     """
 
     os.chdir(sim_dir)
@@ -96,7 +102,7 @@ def direct_estimation(sim_dir, n_traj, n_frames=4, n_dim=3, n_iterations=1000, s
 
     for i_traj in range(n_traj):
         eng = matlab.engine.start_matlab()
-        ExpParam, Data, _ = eng.simulation_py(c_true[i_traj].item(), n_frames, n_dim, nargout=3)
+        ExpParam, Data, _ = eng.simulation_py(c_true[i_traj].item(), n_frames, n_dim, n_trials, nargout=3)
 
         # stop MATLAB engine
         eng.quit()
@@ -138,7 +144,11 @@ def direct_estimation(sim_dir, n_traj, n_frames=4, n_dim=3, n_iterations=1000, s
     if isdegree:
         c_est = c_est * (180 / torch.pi)
         c = c * (180 / torch.pi)
-    return c_est, c_true, c, d, a
+    
+    if n_traj != 1: 
+        return c_est, c_true, c, d, a
+    else:
+        return c_est, c_true, c, d, a, ExpParam, Data
 
 def curvature_estimation(sim_dir, n_traj, n_frames, n_dim, n_iterations=1000, eps=1e-6, lr=1e-4, sim_curvature=None):
     """
@@ -181,19 +191,23 @@ def curvature_estimation(sim_dir, n_traj, n_frames, n_dim, n_iterations=1000, ep
         c_true = torch.zeros(n_traj) + sim_curvature 
 
     for i_traj in range(n_traj):
-        # load data
-        eng = matlab.engine.start_matlab()
-        ExpParam, Data, _ = eng.simulation_py(c_true[i_traj].item(), n_frames, n_dim, nargout=3)
+        # # load data
+        # eng = matlab.engine.start_matlab()
+        # ExpParam, Data, _ = eng.simulation_py(c_true[i_traj].item(), n_frames, n_dim, nargout=3)
 
-        # stop MATLAB engine
-        eng.quit()
+        # # stop MATLAB engine
+        # eng.quit()
 
-        # extract data matrices
-        trial_mat = torch.tensor(Data['resp_mat'])
-        pair_inds = torch.tensor(ExpParam['all_pairs'])
+        # # extract data matrices
+        # trial_mat = torch.tensor(Data['resp_mat'])
+        # pair_inds = torch.tensor(ExpParam['all_pairs'])
 
         # run direct estimation once to get initial values for c and d
-        _, _, c, d, _ = direct_estimation(sim_dir, n_traj=1, n_frames=n_frames, n_dim=n_frames-1, n_iterations=n_iterations, sim_curvature=sim_curvature)
+        _, _, c, d, _, ExpParam, Data = direct_estimation(sim_dir, n_traj=1, n_frames=n_frames, n_dim=n_frames-1, n_iterations=n_iterations, sim_curvature=sim_curvature)
+
+         # extract data matrices
+        trial_mat = torch.tensor(Data['resp_mat'])
+        pair_inds = torch.tensor(ExpParam['all_pairs'])
 
         # create initial values
         d_post_init = d.squeeze()

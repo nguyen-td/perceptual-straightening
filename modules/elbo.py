@@ -47,10 +47,10 @@ class ELBO(nn.Module):
         # self.mu_prior_l = nn.Parameter(torch.rand(1))
 
         # initialize (diagonal) covariance matrices of the prior
-        # self.sigma_prior_d = nn.Parameter(torch.tensor([2.0]))
-        self.sigma_prior_d = nn.Parameter(torch.rand(1))
-        self.sigma_prior_c = nn.Parameter(torch.randn(1)) 
-        # self.sigma_prior_c = nn.Parameter(torch.rand(1) * torch.pi)
+        self.sigma_prior_d = nn.Parameter(torch.tensor([2.0]))
+        # self.sigma_prior_d = nn.Parameter(torch.rand(1))
+        # self.sigma_prior_c = nn.Parameter(torch.randn(1)) 
+        self.sigma_prior_c = nn.Parameter(torch.rand(1) * torch.pi)
         self.sigma_prior_a = nn.Parameter(torch.ones(N-1))
         # self.sigma_prior_a = nn.Parameter(torch.tensor([1.0]))
         # self.sigma_prior_l = nn.Parameter(torch.tensor([1.0]), requires_grad=False)
@@ -61,23 +61,24 @@ class ELBO(nn.Module):
         self.mu_post_d = nn.Parameter(d_post_init)
         # self.mu_post_c = nn.Parameter(torch.rand(N-1) * torch.pi)
         self.mu_post_c = nn.Parameter(c_post_init)
-        self.mu_post_a = nn.Parameter(torch.zeros(N-1, N-1), requires_grad=False)
+        # self.mu_post_a = nn.Parameter(torch.zeros(N-1, N-1), requires_grad=False)
         # self.mu_post_a = nn.Parameter(torch.zeros((N-2) * (N-1)), requires_grad=False)
-        # self.mu_post_a = nn.Parameter(a_post_init)
+        self.mu_post_a = nn.Parameter(a_post_init)
         self.mu_post_l = nn.Parameter(torch.zeros(N-1), requires_grad=False)
         # self.mu_post_l = nn.Parameter(torch.tensor([0.0]), requires_grad=False)
 
-        # initialize sigmas of (N-1) independent posteriors
-        self.sigma_post_d = nn.Parameter(torch.rand(N-1))
-        # self.sigma_post_d = nn.Parameter(torch.mean(d_post_init).repeat(N-1))
-        self.sigma_post_c = nn.Parameter(torch.rand(N-1))
-        # self.sigma_post_c = nn.Parameter(torch.tensor([5.0]).repeat(N-1))
-        self.sigma_post_a = nn.Parameter(torch.randn(N-1, N-1))
-        self.sigma_post_l = nn.Parameter(torch.ones(N-1), requires_grad=False)
+        # # initialize sigmas of (N-1) independent posteriors
+        # self.sigma_post_d = nn.Parameter(torch.randn(N-1))
+        # # self.sigma_post_d = nn.Parameter(torch.mean(d_post_init).repeat(N-1))
+        # self.sigma_post_c = nn.Parameter(torch.randn(N-1))
+        # # self.sigma_post_c = nn.Parameter(torch.tensor([5.0]).repeat(N-1))
+        # self.sigma_post_a = nn.Parameter(torch.randn(N-1, N-1))
+        # self.sigma_post_l = nn.Parameter(torch.ones(N-1), requires_grad=False)
 
-        # # initialize (full) covariance matrix of posterior
+        # initialize (full) covariance matrix of posterior
         # M = (N - 1) + (N - 2) + (N - 2) * (N - 1) + 1 # sum over the dimension of each variable (d, c, a, l)
         # self.sigma_post = nn.Parameter(torch.rand(M, M)) 
+        self.sigma_post = torch.randn(self.N-1, 3 + (N-1), 3 + (N-1)) # 2nd and 3rd dimension: number of variables
 
     def _make_prior_posterior(self):
         """
@@ -115,8 +116,9 @@ class ELBO(nn.Module):
         # define means and covariances of the posterior
         mu_post = torch.vstack((self.mu_post_d, self.mu_post_c, self.mu_post_a, self.mu_post_l)).T
         # mu_post = torch.cat((self.mu_post_d, self.mu_post_c, self.mu_post_a, self.mu_post_l))
-        sigma_post = torch.diag_embed(torch.vstack((self.sigma_post_d, self.sigma_post_c, self.sigma_post_a, self.sigma_post_l)).T)
-        _, L_post = make_positive_definite_batch(sigma_post, self.eps)
+        # sigma_post = torch.diag_embed(torch.vstack((self.sigma_post_d, self.sigma_post_c, self.sigma_post_a, self.sigma_post_l)).T)
+        # _, L_post = make_positive_definite_batch(sigma_post, self.eps)
+        _, L_post = make_positive_definite_batch(self.sigma_post, self.eps)
         # _, L_post = make_positive_definite(self.sigma_post, self.eps)
         posterior = D.MultivariateNormal(mu_post, scale_tril=L_post)
         
