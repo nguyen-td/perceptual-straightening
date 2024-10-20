@@ -10,7 +10,7 @@ This repository contains code for the perceptual curvature estimation algorithm 
 
 The last reference is a very well-written and useful review of the framework that is being used.
 
-The code is tested on simulated trajectories where the ground truth curvature is known. The quality of the estimation is tested by performing a recovery analysis (cf. supplementary figure in [1]). That is, the estimated curvature should be the same (or approximately the same) as the true curvature across the whole range of curvatures, i.e., from 0 to $\frac{\pi}{2}$). The figure below shows a biased estimation (a) and an unbiased, desired estimation (b). Panel a) is the result of the greedy, two-step direct estimation. Panel b) shows the results of the most likely perceptual curvature given many plausible perceptual trajectories, i.e., the method to re-implement.
+The code is tested on simulated trajectories where the ground truth curvature is known. The quality of the estimation is tested by performing recovery analyses (cf. supplementary figure in [1]). That is, the estimated curvature should be the same (or approximately the same) as the true curvature across the whole range of curvatures, i.e., from 0 to $\frac{\pi}{2}$). The figure below shows a biased estimation (a) and an unbiased, desired estimation (b). Panel a) is the result of the greedy, two-step direct estimation. Panel b) shows the results of the most likely perceptual curvature given many plausible perceptual trajectories, i.e., the method to re-implement.
 
 <p float="middle">
   <img src="https://github.com/nguyen-td/perceptual-straightening/blob/main/res/recovery_analysis.png?raw=true"/>     
@@ -47,8 +47,36 @@ perceptual-straightening/
 `utils` contains some other small useful functions called from other functions.
 
 # Current implementation
-In the variational inference framework, the goal is to approximate an intractible posterior $p(x | z)$ with a variational one $q_{\phi}(z)$ (or $q_{\phi}(z | x)$ if it depends on data) that is estimated numerically, where $x$ corresponds to the data and $z$ to the potentially high-dimensional latent (or hidden) variable over which to marginalize (cf. [1,3]). To this end, the evidence lower bound (ELBO) is maximized. Let $(m,n)$ be the data containing the number of correct and incorrect responses in the AXB task, then the goal is to maximize the probability of observing these responses $p_{\theta}(n,m)$, parameterized by a set of parameters $\theta$ (corresponding to the global trajectory parameters). This probability is approximated by a variational posterior distribution, parameterized by its own set of parameters $\phi$ (corresponding to the local estimates of the trajectory parameters): 
+In the variational inference framework, the goal is to numerically approximate an intractible posterior $p(x | z)$ with a variational one $q_{\phi}(z)$ (or $q_{\phi}(z | x)$ if it depends on data), where $x$ corresponds to the data and $z$ to the potentially high-dimensional latent (or hidden) variable over which to marginalize (cf. [1,3]). To this end, the evidence lower bound (ELBO) is maximized. Let $(m,n)$ be the data containing the number of correct and incorrect responses in the AXB task, then the goal is to maximize the probability of observing these responses $p_{\theta}(n,m)$, parameterized by a set of parameters $\theta$ (corresponding to the global trajectory parameters). This probability is approximated by a variational posterior distribution, parameterized by its own set of parameters $\phi$ (corresponding to the local estimates of the trajectory parameters): 
 
 $$
-log p_{\theta}(n,m) \geq \mathbb{E}_{q\_{\phi}(z|n,m)}[log p(n,m | z)] - D\_{KL} \left( q\_{\phi}(z | n,m) \ \rVert \ p\_{\phi}(z) \right)
+log p_{\theta}(n,m) \geq \underbrace{\mathbb{E}_{q\_{\phi}(z|n,m)}[log p(n,m | z)] - D\_{KL} \left( q\_{\phi}(z | n,m) \ \rVert \ p\_{\phi}(z) \right)}\_\text{ELBO}
 $$
+
+## Algorithm
+0. Initialize the prior $p\_{\phi}(z)$ and the variational posterior $q\_{\theta}(z | n,m)$.
+1. Compute the KL-divergence term.
+2. Sample $n$ samples from the variational posterior $z_i \sim q\_{\theta}(z | n,m), \ i = 1, ..., n$.
+3. Use $z$, which contains information about $(d, c, a, \lambda)$, to construct the trajectory and compute the expected likelihood $\frac{1}{n} \sum_i^n log p(n,m | z_i)$. Note that, in the AXB task, the likelihood is governed by a binomial distribution $B(n_{ij},m_{ij} | p_{ij})$ describing the subject's number of correct and incorrect responses.
+5. Compute the ELBO term.
+6. Compute the gradient and update the parameters using the Adam optimizer.
+7. Return to Step 1 until convergence.
+
+## Choice of the prior and posterior
+To avoid ambiguity, vectors and matrices are now denoted using **bold** letters.
+
+Both the prior and posterior are chosen to follow a Gaussian distribution. As such, we have a prior $p_{\boldsymbol{\theta}}(\boldsymbol{z}) = \mathcal{N}(\boldsymbol{\mu}, \boldsymbol{\Sigma})$, where $\boldsymbol{\mu} = \left(\mu_{d^\*}, \mu_{d^\*}, \mu_{\boldsymbol{a}^\*}, \mu_{\lambda^\*}\right)^T$ (note that $\boldsymbol{a}$ is a vector) and 
+
+$$\boldsymbol{\Sigma} = \begin{bmatrix}
+\sigma_{d^\*} & 0   & 0   & 0 \\
+0   & \sigma_{c^\*} & 0   & 0 \\
+0   & 0   & \sigma_{\boldsymbol{a^\*}} & 0 \\
+0   & 0   & 0   & \sigma_{\lambda^\*}
+\end{bmatrix}.$$
+
+Please refer to the current code for which values are currently used for the initialization. Here, $\boldsymbol{\theta}$ referes to all *learnable* parameters, which can be specified. For example, in [1], only $\boldsymbol{\theta} = \left(\mu_{d^\*}, \mu_{c^*\}, \sigma_{d^\*}, \sigma_{c^\*}, \boldsymbol{\Sigma_{a}^\*}\right)$ were chosen to be learnable. A learnable parameter can be specified by setting `requires_grad=True`. The prior shapes the *global* parameters, i.e., the global distance, the global curvature etc.
+
+The posterior shapes the *local* parameters, i.e., we have one posterior distribution for each node - 1. The values are defined  
+
+
+
