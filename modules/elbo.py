@@ -156,7 +156,7 @@ class ELBO(nn.Module):
             Transformed variable
         """
 
-        def smooth_step_function(x, epsilon=1e-3):    
+        def smooth_step_function(x, epsilon=1e-3):   
             """
             Differentiable approximation of the following piecewise function: 
             
