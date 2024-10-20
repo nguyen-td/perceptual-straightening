@@ -41,7 +41,7 @@ perceptual-straightening/
 
 `data/` contains data that can be used for the analysis. Since the current version can generate data during runtime by calling the respective MATLAB function `simulation_py.mat`, this folder may not be necessary. It does, however, contain some of the real data used in previous work.
 
-`modules/` contains the main chunk of the low-level code. `elbo.py` contains the low-level code of the hierarchical algorithm, `recovery_analysis.py` contains code for the recovery analysis, both for the direct estimation of the advanced, unbiased estimation, though it does not work as intended yet. 
+`modules/` contains the main chunk of the low-level code. `elbo.py` contains the low-level code of the hierarchical algorithm, `recovery_analysis.py` contains code for the recovery analysis, both for the direct estimation and the advanced, unbiased estimation, though it does not work as intended yet. 
 
 `res` contains figures for the repository, i.e., it's not relevant for the actual algorithm but should not be deleted either.
 
