@@ -19,7 +19,7 @@ The code is tested on simulated trajectories where the ground truth curvature is
 
 📌 Running the code might require the [MATLAB Engine API for Python](https://www.mathworks.com/help/matlab/matlab_external/install-the-matlab-engine-for-python.html), which itself requires the most updated version of MATLAB. We use this to call a MATLAB function directly from Python without the need to translate MATLAB code into Python explicitely. 
 
-💡The original Lua implementation can be found here [Olivier Hénaff's repository](https://github.com/olivierhenaff/perceptual-straightening/tree/master). 
+💡The original Lua implementation can be found here: [Olivier Hénaff's repository](https://github.com/olivierhenaff/perceptual-straightening/tree/master). 
 
 ## Quick start
 
