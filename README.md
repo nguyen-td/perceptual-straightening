@@ -83,7 +83,7 @@ $$\boldsymbol{\Sigma} = \begin{bmatrix}
 
 Please refer to the current code for which values are currently used for the initialization. Here, $\boldsymbol{\theta}$ referes to all *learnable* parameters, which can be specified. For example, in [1], only $\boldsymbol{\theta} = \left(\mu_{d^\*}, \mu_{c^*\}, \sigma_{d^\*}, \sigma_{c^\*}, \boldsymbol{\Sigma_{a}^\*}\right)$ were chosen to be learnable. A learnable parameter can be specified by setting `requires_grad=True`. The prior shapes the *global* parameters, i.e., the global distance, the global curvature etc.
 
-The posterior shapes the *local* parameters, i.e., we have one posterior distribution for each node - 1. Let T denote the number of nodes, then the variables are defined over the following spaces:
+The posterior shapes the *local* parameters, i.e., we have one posterior distribution for each node - 1. Let $T$ denote the number of nodes, then the variables are defined over the following spaces:
 
 $$\lambda \in \mathbb{R}$$
 $$d_t \in \mathbb{R}, \quad t = 1, \ldots, T$$
