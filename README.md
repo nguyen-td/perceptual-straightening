@@ -76,7 +76,27 @@ $$\boldsymbol{\Sigma} = \begin{bmatrix}
 
 Please refer to the current code for which values are currently used for the initialization. Here, $\boldsymbol{\theta}$ referes to all *learnable* parameters, which can be specified. For example, in [1], only $\boldsymbol{\theta} = \left(\mu_{d^\*}, \mu_{c^*\}, \sigma_{d^\*}, \sigma_{c^\*}, \boldsymbol{\Sigma_{a}^\*}\right)$ were chosen to be learnable. A learnable parameter can be specified by setting `requires_grad=True`. The prior shapes the *global* parameters, i.e., the global distance, the global curvature etc.
 
-The posterior shapes the *local* parameters, i.e., we have one posterior distribution for each node - 1. The values are defined  
+The posterior shapes the *local* parameters, i.e., we have one posterior distribution for each node - 1. Let T denote the number of nodes, then the variables are defined over the following spaces:
+
+$$\lambda \in \mathbb{R}$$
+$$d_t \in \mathbb{R}, \quad t = 1, \ldots, T$$
+$$c_t \in \mathbb{R}, \quad t = 2, \ldots, T$$
+$$\boldsymbol{a_t} \in \mathbb{R}^{(N-1)}, \quad t = 2, \ldots, T$$
+$$\boldsymbol{v_t} \in \mathbb{R}^{(N-1)}, \quad t = 1, \ldots, T$$
+$$\boldsymbol{x_t} \in \mathbb{R}^{(N-1)}, \quad t = 0, \ldots, T$$
+
+One assumption that is made in this version is the mean-field approximation [cf. [3]], where the posterior distribution is defined as a *family* of independent distributions. This means that information for each node (distance, curvature, acceleration, lapse rate) comes from an independent posterior. This assumption is not specified in the paper but we believe it is a plausible one (in any case, the code also contains an option where the posterior is defined as a single big multivariate normal). Under this assumption, the posterior is defined as
+
+$$q_{\boldsymbol{\phi}}(\boldsymbol{z | n, m}) = \prod^{(T-1)}_j q_j(\boldsymbol{z}_j | \boldsymbol{n, m}).$$
+
+Each of the $(T-1)$ individual posteriors are governed by their own set of means and covariances similar to the prior, i.e., $\boldsymbol{\mu}\_j^{(t)} = \left(\mu_{d_t}, \mu_{c_t}, \mu_{\boldsymbol{a}\_t}, \mu_{\lambda}\right)^T$, and analogously for the covariance matrix. 
+
+⚠️ **Initialization of the posterior**
+> Right now, the means of the posterior distributions are initialized by running the biased, direct two-step maximum likelihood estimation and then taking the biased estimations of the direction, curvature, and acceleration as the initial values for the actual algorithm. This improved the recovery analysis in that the estimation algorithm has become biased itself now. However, it is still an improvement to how it was before (see figures below). We believe that this also explains the dependency of the posterior on data, even if it is technically not necessary, i.e., $q_{\phi}(\boldsymbol{z | n,m})$ instead of $q_{\phi}(\boldsymbol{z})$.
+
+We currently believe that finding out the proper initialization scheme for the prior and posterior will be key to solving this problem. 
+
+
 
 
 
