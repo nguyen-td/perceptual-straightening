@@ -57,7 +57,7 @@ log p_{\theta}(n,m) \geq \mathbb{E}_{q\_{\phi}(z|n,m)}[log p(n,m | z)] - D\_{KL}
 $$ 
 
 $$
-log p_{\theta}(n,m) \geq ELBO
+log p_{\theta}(n,m) \geq ELBO(q)
 $$ 
 
 ## Algorithm
