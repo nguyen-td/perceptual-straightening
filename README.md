@@ -25,6 +25,7 @@ The code is tested on simulated trajectories where the ground truth curvature is
 
 - [main.ipynb](https://github.com/nguyen-td/perceptual-straightening/blob/main/main.ipynb): Estimate curvature of a single simulated trajectory and visualize the training progress.
 - [direct_estimation.ipynb](https://github.com/nguyen-td/perceptual-straightening/blob/main/direct_estimation.ipynb): Recovery analysis of the biased direct estimation method using maximum likelihood on the observer model (binomial likelihood in [1]).
+- (recovery_analysis.ipynb)[https://github.com/nguyen-td/perceptual-straightening/blob/main/recovery_analysis.ipynb]: Recovery analysis of the unbiased curvature estimation. It takes around 12 hours to finish, so don't run it until the code has been properly optimized to run on a cluster. Ideally, the resulting figure looks like (b).
 
 # Repository structure
 After cloning or forking this repository, your project layout should look as follows:
