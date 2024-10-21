@@ -96,7 +96,7 @@ One assumption that is made in this version is the mean-field approximation (cf.
 
 $$q_{\boldsymbol{\phi}}(\boldsymbol{z | n, m}) = \prod^{T}_{j=1} q_j(\boldsymbol{z}_j | \boldsymbol{n, m}).$$
 
-Each of the $T$ individual posteriors are governed by their own set of means and covariances similar to the prior, i.e., $\boldsymbol{\mu}\_j^{(t)} = \left(\mu_{d_t}, \mu_{c_t}, \mu_{\boldsymbol{a}\_t}, \mu_{\lambda}\right)^T$, and analogously for the covariance matrix. 
+Each of the $T$ individual posteriors are governed by their own set of means and covariances similar to the prior, i.e., $\boldsymbol{\mu}\_j^{(t)} = \left(\mu_{d_t}, \mu_{c_t}, \mu_{\boldsymbol{a}\_t}, \mu_{\lambda}\right)^T$, and analogously for the covariance matrix. Similarly, $\boldsymbol{\phi}$ refers to those posterior parameters that are *learnable*.
 
 ⚠️ **Initialization of the posterior**
 > Right now, the means of the posterior distributions are initialized by running the biased, direct two-step maximum likelihood estimation and then taking the biased estimations of the direction, curvature, and acceleration as the initial values for the actual algorithm. This improved the recovery analysis in that the estimation algorithm has become biased itself now. However, it is still an improvement to how it was before (see figures below). We believe that this also explains the dependency of the posterior on data, even if it is technically not necessary, i.e., choosing $q_{\phi}(\boldsymbol{z | n,m})$ over $q_{\phi}(\boldsymbol{z})$ in the paper.
