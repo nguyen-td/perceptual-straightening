@@ -63,7 +63,7 @@ $$
 ## Algorithm
 0. Initialize the prior $p\_{\theta}(z)$ and the variational posterior $q\_{\phi}(z | n,m)$.
 1. Compute the KL-divergence term.
-2. Sample $n$ samples from the variational posterior $z_i \sim q\_{\theta}(z | n,m), \quad i = 1, ..., n$.
+2. Sample $n$ samples from the variational posterior $z_i \sim q\_{\phi}(z | n,m), \quad i = 1, ..., n$.
 3. Use $z$, which contains information about $(d, c, a, \lambda)$, to construct the trajectory and compute the expected likelihood $\frac{1}{n} \sum_i^n log p(n,m | z_i)$. Note that, in the AXB task, the likelihood is governed by a binomial distribution $B(n_{ij},m_{ij} | p_{ij})$ describing the subject's number of correct and incorrect responses.
 5. Compute the ELBO term.
 6. Compute the gradient and update the parameters using the Adam optimizer.
