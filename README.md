@@ -50,7 +50,7 @@ perceptual-straightening/
 `utils` contains some other small useful functions called from other functions.
 
 # Current implementation
-In the variational Bayesian inference framework, the goal is to numerically approximate an intractible posterior $p(z | x)$ with a variational one $q_{\phi}(z)$ (or $q_{\phi}(z | x)$ if it depends on data), where $x$ corresponds to the data and $z$ to the potentially high-dimensional latent (or hidden) variable over which to marginalize (cf. [1,3]). To this end, the evidence lower bound (ELBO) is maximized. Let $(m,n)$ be the data containing the number of correct and incorrect responses in the AXB task, then the goal is to maximize the probability of observing these responses $p_{\theta}(n,m)$, parameterized by a set of parameters $\theta$ (corresponding to the global trajectory parameters). This probability is approximated by the ELBO: 
+In the variational Bayesian inference framework, the goal is to numerically approximate an intractible posterior $p(z | x)$ with a variational one $q_{\phi}(z)$ (or $q_{\phi}(z | x)$ if it depends on data), where $x$ corresponds to the data and $z$ to the potentially high-dimensional latent (or hidden) variable over which to marginalize (cf. [1,3]). Let $(m,n)$ be the data containing the number of correct and incorrect responses in the AXB task, then the goal is to maximize the probability of observing these responses $p_{\theta}(n,m)$, parameterized by a set of parameters $\theta$ (corresponding to the global trajectory parameters). This probability is approximated by the evidence lower bound (ELBO): 
 
 $$
 log p_{\theta}(n,m) \geq \mathbb{E}_{q\_{\phi}(z|n,m)}[log p(n,m | z)] - D\_{KL} \left( q\_{\phi}(z | n,m) \ \rVert \ p\_{\phi}(z) \right)
