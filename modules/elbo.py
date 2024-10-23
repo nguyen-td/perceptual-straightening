@@ -10,7 +10,11 @@ from utils import make_positive_definite, make_positive_definite_batch, log_like
 
 class ELBO(nn.Module):
     """
-    Class for optimizing the ELBO term. Note that the prior will contain global trajectory variables (one value for each variable: d*, c*, a*, l*), whereas the variational distribution will contain the local trajectory variables, i.e., a set of local variables for each node (or for N-1 or N-2 nodes, respectively: d(t), d(t+1)..., c(t), c(t+1), ..., a(t), a(t+1), ..., l). To match the dimension for computing the KL-divergence term, the prior will still have the same dimensions but with repeating values. For example, the variational distribution has N-1 values for the local 'd' parameter, the prior distribution has N-1 times the *same*  value for the 'd' parameter. 
+    Class for optimizing the ELBO term. 
+    
+    The following only holds for a posterior that is *NOT* implemented within the mean-field approximation framework:
+
+    The prior will contain global trajectory variables (one value for each variable: d*, c*, a*, l*), whereas the variational distribution will contain the local trajectory variables, i.e., a set of local variables for each node (or for N-1 or N-2 nodes, respectively: d(t), d(t+1)..., c(t), c(t+1), ..., a(t), a(t+1), ..., l). To match the dimension for computing the KL-divergence term, the prior will still have the same dimensions but with repeating values. For example, the variational distribution has N-1 values for the local 'd' parameter, the prior distribution has N-1 times the *same*  value for the 'd' parameter. 
 
     Input:
     ------
