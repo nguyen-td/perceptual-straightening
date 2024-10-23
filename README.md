@@ -90,7 +90,9 @@ $$d_t \in \mathbb{R}, \quad t = 1, \ldots, T$$
 $$c_t \in \mathbb{R}, \quad t = 2, \ldots, T$$
 $$\boldsymbol{a_t} \in \mathbb{R}^{(N-1)}, \quad t = 2, \ldots, T$$
 $$\boldsymbol{v_t} \in \mathbb{R}^{(N-1)}, \quad t = 1, \ldots, T$$
-$$\boldsymbol{x_t} \in \mathbb{R}^{(N-1)}, \quad t = 0, \ldots, T$$
+$$\boldsymbol{x_t} \in \mathbb{R}^{(N-1)}, \quad t = 0, \ldots, T,$$
+
+where $N$ refers to the number of dimensions, i.e., $T = N - 1$.
 
 One assumption that is made in this version is the mean-field approximation (cf. [3]), where the posterior distribution is defined as a *family* of independent distributions. This means that information for each node (distance, curvature, acceleration, lapse rate) comes from an independent posterior. This assumption is not specified in the paper but we believe it is a plausible one (in any case, the code also contains an option where the posterior is defined as a single big multivariate normal). Under this assumption, the posterior is defined as
 
