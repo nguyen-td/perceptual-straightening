@@ -94,7 +94,7 @@ $$\boldsymbol{x_t} \in \mathbb{R}^{(N-1)}, \quad t = 0, \ldots, T,$$
 
 where $N$ refers to the number of dimensions, i.e., $T = N - 1$.
 
-One assumption that is made in this version is the mean-field approximation (cf. [3]), where the posterior distribution is defined as a *family* of independent distributions. This means that information for each node (distance, curvature, acceleration, lapse rate) comes from an independent posterior. This assumption is not specified in the paper but we believe it is a plausible one (in any case, the code also contains an option where the posterior is defined as a single big multivariate normal). Under this assumption, the posterior is defined as
+One assumption that is made in this version is the mean-field approximation (cf. [3]), where the posterior distribution is defined as a *family* of independent distributions. This means that information for each node (distance, curvature, acceleration, lapse rate) comes from an independent posterior. This assumption is not specified in the paper but we believe it is a plausible one (in any case, the code also contains a commented version where the posterior is defined as a single big multivariate normal). Under this assumption, the posterior is defined as
 
 $$q_{\boldsymbol{\phi}}(\boldsymbol{z | n, m}) = \prod^{T}_{j=1} q_j(\boldsymbol{z}_j | \boldsymbol{n, m}).$$
 
