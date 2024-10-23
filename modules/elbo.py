@@ -298,7 +298,7 @@ class ELBO(nn.Module):
     
     def compute_loss(self, log_ll, kl_divergence):
         """
-        Returns the ELBO function. Minimizing the negative log likelihood is equivalent to maximizing the likelihood.
+        Returns the ELBO function. Minimizing the negative log likelihood is equivalent to maximizing the log likelihood.
 
         Inputs:
         -------
