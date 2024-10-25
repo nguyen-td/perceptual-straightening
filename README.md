@@ -96,9 +96,9 @@ where $N$ refers to the number of dimensions, i.e., $T = N - 1$.
 
 One assumption that is made in this version is the mean-field approximation (cf. [3]), where the posterior distribution is defined as a *family* of independent distributions. This means that information for each node (distance, curvature, acceleration, lapse rate) comes from an independent posterior. This assumption is not specified in the paper but we believe it is a plausible one (in any case, the code also contains a commented version where the posterior is defined as a single big multivariate normal). Under this assumption, the posterior is defined as
 
-$$q_{\boldsymbol{\phi}}(\boldsymbol{z | n, m}) = \prod^{T}_{j=1} q_j(\boldsymbol{z}_j | \boldsymbol{n, m}).$$
+$$q_{\boldsymbol{\phi}}(\boldsymbol{z | n, m}) = \prod^{T}_{t=1} q_j(\boldsymbol{z}_t | \boldsymbol{n, m}).$$
 
-Each of the $T$ individual posteriors are governed by their own set of means and covariances similar to the prior, i.e., $\boldsymbol{\mu}\_j^{(t)} = \left(\mu_{d_t}, \mu_{c_t}, \mu_{\boldsymbol{a}\_t}, \mu_{\lambda}\right)^T$, and analogously for the covariance matrix. Similarly, $\boldsymbol{\phi}$ refers to those posterior parameters that are *learnable*.
+Each of the $T$ individual posteriors are governed by their own set of means and covariances similar to the prior, i.e., $\boldsymbol{\mu}\_t = \left(\mu_{d_t}, \mu_{c_t}, \mu_{\boldsymbol{a}\_t}, \mu_{\lambda}\right)^T$, and analogously for the covariance matrix. Similarly, $\boldsymbol{\phi}$ refers to those posterior parameters that are *learnable*.
 
 ⚠️ **Initialization of the posterior**
 > Right now, the means of the posterior distributions are initialized by running the biased, direct two-step maximum likelihood estimation and then taking the biased estimations of the direction, curvature, and acceleration as the initial values for the actual algorithm. This improved the recovery analysis in that the estimation algorithm has become biased itself now. However, it is still an improvement to how it was before (see figures below). We believe that this also explains the dependency of the posterior on data, even if it is technically not necessary, i.e., choosing $q_{\phi}(\boldsymbol{z | n,m})$ over $q_{\phi}(\boldsymbol{z})$ in the paper.
