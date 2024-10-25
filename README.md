@@ -96,7 +96,7 @@ where $N$ refers to the number of dimensions, i.e., $T = N - 1$.
 
 One assumption that is made in this version is the mean-field approximation (cf. [3]), where the posterior distribution is defined as a *family* of independent distributions. This means that information for each node (distance, curvature, acceleration, lapse rate) comes from an independent posterior. This assumption is not specified in the paper but we believe it is a plausible one (in any case, the code also contains a commented version where the posterior is defined as a single big multivariate normal). Under this assumption, the posterior is defined as
 
-$$q_{\boldsymbol{\phi}}(\boldsymbol{z | n, m}) = \prod^{T}_{t=1} q_j(\boldsymbol{z}_t | \boldsymbol{n, m}).$$
+$$q_{\boldsymbol{\phi}}(\boldsymbol{z | n, m}) = \prod^{T}_{t=1} q_t(\boldsymbol{z}_t | \boldsymbol{n, m}).$$
 
 Each of the $T$ individual posteriors are governed by their own set of means and covariances similar to the prior, i.e., $\boldsymbol{\mu}\_t = \left(\mu_{d_t}, \mu_{c_t}, \mu_{\boldsymbol{a}\_t}, \mu_{\lambda}\right)^T$, and analogously for the covariance matrix. Similarly, $\boldsymbol{\phi}$ refers to those posterior parameters that are *learnable*.
 
