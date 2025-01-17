@@ -100,10 +100,10 @@ function [ExpParam, Data, Pc_reshaped] = simulation_py(avg_curvature, n_frames, 
     end
             
     % calculate proportion correct
-    Pc = NaN(1,length(ExpParam.all_pairs));
+    Pc = NaN(1, length(ExpParam.all_pairs));
     for i = 1:length(ExpParam.all_pairs)
-        Pc(i) = sum(Data.resp_mat(:,i))/ExpParam.numTrials;
+        % Pc(i) = sum(Data.resp_mat(:,i))/ExpParam.numTrials;
+        Pc(i) = sum(Data.resp_mat(:,i))/double(ExpParam.numTrials);
     end
     Pc_reshaped = reshape(Pc,ExpParam.numFrames,ExpParam.numFrames);
-
 end

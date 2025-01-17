@@ -3,10 +3,10 @@
 close all; clear all; clc;
 
 %% global constants
-ExpParam.numFrames  = 5;
-ExpParam.avgLocCurv = 50;
+ExpParam.numFrames  = 11;
+ExpParam.avgLocCurv = 20;
 ExpParam.numTrials  = 1000; 
-ExpParam.numDim     = 4; %dimensionality of the perceptual space
+ExpParam.numDim     = 10; % dimensionality of the perceptual space
 
 %% generate a perceptual trajectory of N frames
 v_0              = ones(1,ExpParam.numDim)'; % first vector at t0
@@ -61,29 +61,29 @@ axis equal; grid on; hold on;
 title('Simulated perceptual trajectory in PC space');
 
 %% visualize the perceptual trajectory for 2d
-figure(1);
-for i = 2:ExpParam.numFrames  
-    plot([ExpParam.vectors(1,i-1),ExpParam.vectors(1,i)],[ExpParam.vectors(2,i-1),ExpParam.vectors(2,i)],'-o','LineWidth', 1.5)
-    hold on;
-end
-axis equal; grid on; hold on;
-xlim([round(min(min(ExpParam.vectors)))-3, round(max(max(ExpParam.vectors)))+3]); 
-ylim([round(min(min(ExpParam.vectors)))-3, round(max(max(ExpParam.vectors)))+3]);
-title('Simulated perceptual trajectory');
-
-%% visualize the perceptual trajectory for >= 3d (plotting first 3 dimensions)
 % figure(1);
 % for i = 2:ExpParam.numFrames  
-% plot3([ExpParam.vectors(1,i-1), ExpParam.vectors(1,i)], [ExpParam.vectors(2,i-1), ExpParam.vectors(2,i)],...
-%     [ExpParam.vectors(3,i-1), ExpParam.vectors(3,i)], '-o', 'LineWidth', 1.5)    
-% hold on;
+%     plot([ExpParam.vectors(1,i-1),ExpParam.vectors(1,i)],[ExpParam.vectors(2,i-1),ExpParam.vectors(2,i)],'-o','LineWidth', 1.5)
+%     hold on;
 % end
-% grid on; hold on;
-% xlim([min(ExpParam.vectors(1, :)) - 3, max(ExpParam.vectors(1, :)) + 3]);
-% ylim([min(ExpParam.vectors(2, :)) - 3, max(ExpParam.vectors(2, :)) + 3]);
-% zlim([min(ExpParam.vectors(3, :)) - 3, max(ExpParam.vectors(3, :)) + 3]);
-% axis equal;
-% title('Simulated perceptual trajectory in 3D');
+% axis equal; grid on; hold on;
+% xlim([round(min(min(ExpParam.vectors)))-3, round(max(max(ExpParam.vectors)))+3]); 
+% ylim([round(min(min(ExpParam.vectors)))-3, round(max(max(ExpParam.vectors)))+3]);
+% title('Simulated perceptual trajectory');
+
+%% visualize the perceptual trajectory for >= 3d (plotting first 3 dimensions)
+figure(1);
+for i = 2:ExpParam.numFrames  
+plot3([ExpParam.vectors(1,i-1), ExpParam.vectors(1,i)], [ExpParam.vectors(2,i-1), ExpParam.vectors(2,i)],...
+    [ExpParam.vectors(3,i-1), ExpParam.vectors(3,i)], '-o', 'LineWidth', 1.5)    
+hold on;
+end
+grid on; hold on;
+xlim([min(ExpParam.vectors(1, :)) - 3, max(ExpParam.vectors(1, :)) + 3]);
+ylim([min(ExpParam.vectors(2, :)) - 3, max(ExpParam.vectors(2, :)) + 3]);
+zlim([min(ExpParam.vectors(3, :)) - 3, max(ExpParam.vectors(3, :)) + 3]);
+axis equal;
+title('Simulated perceptual trajectory in 3D');
 
 %% generate n-d isotropic gaussians centered on each frame (visualization ONLY, 2d)
 % mus = ExpParam.vectors;
@@ -140,8 +140,8 @@ Data.resp_mat  = NaN(ExpParam.numTrials,length(ExpParam.all_pairs));
 
 for i = 1:length(ExpParam.all_pairs)
     for j = 1:ExpParam.numTrials
-        simA = mvnrnd(mus(:,ExpParam.all_pairs(i,1)),sigma_mat,1);
-        simB = mvnrnd(mus(:,ExpParam.all_pairs(i,2)),sigma_mat,1);
+        simA = mvnrnd(mus(:,ExpParam.all_pairs(i,1)),sigma_mat,1); % frame A
+        simB = mvnrnd(mus(:,ExpParam.all_pairs(i,2)),sigma_mat,1); % frame B
         if rem(j,2) == 0
             simX = mvnrnd(mus(:,ExpParam.all_pairs(i,1)),sigma_mat,1); %draw from A
             dist_AX = distance(simA,simX);

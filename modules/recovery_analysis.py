@@ -86,6 +86,8 @@ def direct_estimation(sim_dir, n_traj, n_frames=4, n_dim=3, n_iterations=1000, n
         Contains experimental parameters
     Data: Dictionary
         Contains the trial matrix with correct (1) and incorrect (0) responses
+    Pc_reshaped: (n_frames x n_frames) torch tensor
+        Discriminability matrix
     """
 
     os.chdir(sim_dir)
@@ -93,28 +95,33 @@ def direct_estimation(sim_dir, n_traj, n_frames=4, n_dim=3, n_iterations=1000, n
 
     c_est = torch.zeros(n_traj)
     if not isinstance(sim_curvature, (int, float)):
-        c_true = (torch.rand(n_traj) * (torch.pi)) * (180 / torch.pi) # in degrees
+        c_true = torch.rad2deg(torch.rand(1) * (torch.pi)) 
     else:
-        c_true = torch.zeros(n_traj) + sim_curvature 
+        c_true = torch.zeros(1) + sim_curvature
     c = torch.zeros(n_traj, n_frames-2)
     a = torch.zeros(n_traj, n_frames-2, n_frames-1)
     d = torch.zeros(n_traj, n_frames-1)
 
+    eng = matlab.engine.start_matlab()
+    ExpParam, Data, Pc_reshaped = eng.simulation_py(int(c_true.item()), n_frames, n_dim, n_trials, nargout=3)
+
+    # stop MATLAB engine
+    eng.quit()
+
+    # extract data matrices and save them
+    trial_mat = torch.tensor(Data['resp_mat'])
+    pair_inds = torch.tensor(ExpParam['all_pairs'])
+
+    torch.save(trial_mat, Path('..') / 'data' / 'simulations' / f'trial_mat_{int(c_true.item())}.pt')
+    torch.save(torch.tensor(Pc_reshaped), Path('..') / 'data' / 'simulations' / f'Pc_reshaped{int(c_true.item())}.pt')
+
+    print(f'Proportion of correct responses: {torch.sum(trial_mat) / torch.numel(trial_mat)}')
+
     for i_traj in range(n_traj):
-        eng = matlab.engine.start_matlab()
-        ExpParam, Data, _ = eng.simulation_py(c_true[i_traj].item(), n_frames, n_dim, n_trials, nargout=3)
-
-        # stop MATLAB engine
-        eng.quit()
-
-        # extract data matrices
-        trial_mat = torch.tensor(Data['resp_mat'])
-        pair_inds = torch.tensor(ExpParam['all_pairs'])
-
         # initialize parameters
         N = n_frames
         l = 0.06 # lambda
-        x = nn.Parameter(torch.rand(1, N, N - 1))
+        x = nn.Parameter(torch.rand(1, N, N - 1) + 1.5) # range: [1, 2.5]
 
         # set up optimizer
         lr = 1e-4
@@ -142,13 +149,10 @@ def direct_estimation(sim_dir, n_traj, n_frames=4, n_dim=3, n_iterations=1000, n
         print(f"Trajectory: {i_traj}")
 
     if isdegree:
-        c_est = c_est * (180 / torch.pi)
-        c = c * (180 / torch.pi)
+        c_est = torch.rad2deg(c_est)
+        c = torch.rad2deg(c)
     
-    if n_traj != 1: 
-        return c_est, c_true, c, d, a
-    else:
-        return c_est, c_true, c, d, a, ExpParam, Data
+    return c_est, c_true, c, d, a, ExpParam, Data, torch.tensor(Pc_reshaped)
 
 def curvature_estimation(sim_dir, n_traj, n_frames, n_dim, n_iterations=1000, eps=1e-6, lr=1e-4, sim_curvature=None):
     """

@@ -30,46 +30,70 @@ class ELBO(nn.Module):
         Regularization factor to ensure numerical stability for computing the Cholesky decomposition
     """
     
-    def __init__(self, N, d_post_init, c_post_init, a_post_init, eps=1e-6):
+    def __init__(self, 
+                 N, 
+                 mu_prior_d_init, 
+                 mu_prior_c_init, 
+                 mu_prior_a_init, 
+                 mu_prior_l_init, 
+                 sigma_prior_d_init, 
+                 sigma_prior_c_init, 
+                 sigma_prior_a_init, 
+                 sigma_prior_l_init, 
+                 mu_post_d_init, 
+                 mu_post_c_init, 
+                 mu_post_a_init,
+                 mu_post_l_init, 
+                 sigma_post_init, 
+                 eps=1e-6
+                ):
         super(ELBO, self).__init__()
 
         self.N = N
         self.eps = eps
 
         # initialize means of the prior
-        self.mu_prior_d = nn.Parameter(torch.rand(1))
+        self.mu_prior_d = mu_prior_d_init
+        # self.mu_prior_d = nn.Parameter(torch.rand(1))
         # self.mu_prior_d = nn.Parameter(torch.mean(d_post_init, dim=0, keepdim=True)) 
         # self.mu_prior_d = nn.Parameter(torch.tensor([0.2]))
-        self.mu_prior_c = nn.Parameter(torch.rand(1) * torch.pi/2)
+        self.mu_prior_c = mu_prior_c_init
+        # self.mu_prior_c = nn.Parameter(torch.rand(1) * torch.pi/2)
         # self.mu_prior_c = nn.Parameter(torch.mean(c_post_init[:, 1:], dim=1))
         # self.mu_prior_c = nn.Parameter(torch.pi / torch.tensor([4.0]))
+        self.mu_prior_a = mu_prior_a_init
         # self.mu_prior_a = nn.Parameter(torch.tensor([0.0]), requires_grad=False)
-        self.mu_prior_a = nn.Parameter(torch.tensor([0.0]))
+        # self.mu_prior_a = nn.Parameter(torch.tensor([0.0]))
         # self.mu_prior_a = nn.Parameter(torch.randn(1))
+        self.mu_prior_l = mu_prior_l_init
         # self.mu_prior_l = nn.Parameter(torch.tensor([0.0]), requires_grad=False)
-        self.mu_prior_l = nn.Parameter(torch.tensor([0.0]))
+        # self.mu_prior_l = nn.Parameter(torch.tensor([0.0]))
         # self.mu_prior_l = nn.Parameter(torch.rand(1))
 
         # initialize (diagonal) covariance matrices of the prior
-        self.sigma_prior_d = nn.Parameter(torch.tensor([2.0]))
+        self.sigma_prior_d = sigma_prior_d_init
+        # self.sigma_prior_d = nn.Parameter(torch.tensor([2.0]))
         # self.sigma_prior_d = nn.Parameter(torch.rand(1))
+        self.sigma_prior_c = sigma_prior_c_init
         # self.sigma_prior_c = nn.Parameter(torch.randn(1)) 
-        self.sigma_prior_c = nn.Parameter(torch.rand(1) * torch.pi)
-        self.sigma_prior_a = nn.Parameter(torch.ones(N-1))
+        # self.sigma_prior_c = nn.Parameter(torch.rand(1) * torch.pi)
+        self.sigma_prior_a = sigma_prior_a_init
+        # self.sigma_prior_a = nn.Parameter(torch.ones(N-1))
         # self.sigma_prior_a = nn.Parameter(torch.tensor([1.0]))
+        self.sigma_prior_l = sigma_prior_l_init
         # self.sigma_prior_l = nn.Parameter(torch.tensor([1.0]), requires_grad=False)
-        self.sigma_prior_l = nn.Parameter(torch.tensor([1.0]))
+        # self.sigma_prior_l = nn.Parameter(torch.tensor([1.0]))
 
         # initialize means of (N-1) independent posteriors
-        # self.mu_post_d = nn.Parameter(torch.randn(N-1))
-        self.mu_post_d = nn.Parameter(d_post_init)
+        # self.mu_post_d = nn.Parameter(torch.rand(N-1))
+        self.mu_post_d = nn.Parameter(mu_post_d_init)
         # self.mu_post_c = nn.Parameter(torch.rand(N-1) * torch.pi)
-        self.mu_post_c = nn.Parameter(c_post_init)
+        self.mu_post_c = nn.Parameter(mu_post_c_init)
         # self.mu_post_a = nn.Parameter(torch.zeros(N-1, N-1), requires_grad=False)
         # self.mu_post_a = nn.Parameter(torch.zeros((N-2) * (N-1)), requires_grad=False)
-        self.mu_post_a = nn.Parameter(a_post_init)
-        self.mu_post_l = nn.Parameter(torch.zeros(N-1), requires_grad=False)
-        # self.mu_post_l = nn.Parameter(torch.tensor([0.0]), requires_grad=False)
+        self.mu_post_a = nn.Parameter(mu_post_a_init)
+        # self.mu_post_l = nn.Parameter(torch.zeros(N-1), requires_grad=False)
+        self.mu_post_l = nn.Parameter(mu_post_l_init)
 
         # # initialize sigmas of (N-1) independent posteriors
         # self.sigma_post_d = nn.Parameter(torch.randn(N-1))
@@ -81,8 +105,8 @@ class ELBO(nn.Module):
 
         # initialize (full) covariance matrix of posterior
         # M = (N - 1) + (N - 2) + (N - 2) * (N - 1) + 1 # sum over the dimension of each variable (d, c, a, l)
-        # self.sigma_post = nn.Parameter(torch.rand(M, M)) 
-        self.sigma_post = torch.randn(self.N-1, 3 + (N-1), 3 + (N-1)) # 2nd and 3rd dimension: number of variables
+        self.sigma_post = nn.Parameter(sigma_post_init) 
+        # self.sigma_post = torch.randn(self.N-1, 3 + (N-1), 3 + (N-1)) # 2nd and 3rd dimension: number of variables
 
     def _make_prior_posterior(self):
         """
@@ -100,7 +124,8 @@ class ELBO(nn.Module):
         # define means and covariances of the prior, extend the dimension of mu and sigma to match those of the posterior
         mu_prior = torch.cat((self.mu_prior_d, 
                               self.mu_prior_c, 
-                              self.mu_prior_a.repeat(self.N-1), 
+                            #   self.mu_prior_a.repeat(self.N-1), 
+                              self.mu_prior_a, 
                               self.mu_prior_l), 0)
         _, L_prior = make_positive_definite(torch.diag(torch.cat((self.sigma_prior_d, 
                                                                   self.sigma_prior_c, 
@@ -267,7 +292,7 @@ class ELBO(nn.Module):
         _, posterior = self._make_prior_posterior()
         
         # use reparameterization trick (cf. Kingma and Welling, 2022) to sample from approximate distribution
-        z_q = posterior.rsample(sample_shape=(n_samples, )) # shape: (n_samples x (N-1) x (3 + N - 1))
+        z_q = posterior.rsample(sample_shape=(n_samples, )) # shape: (n_samples x (N - 1) x (3 + N - 1))
 
         # define trajectory variables
         d_size = self.N - 1
