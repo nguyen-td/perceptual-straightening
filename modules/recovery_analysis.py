@@ -37,7 +37,7 @@ def compute_curvature(x, N):
     d = torch.zeros(N-1)
     
     for t in range(1, N):
-        v = x.squeeze()[t] - x.squeeze()[t-1]
+        v = x.squeeze()[t] - x.squeeze()[t-1] 
         v_hat[t-1] = v / torch.linalg.norm(v)
         d[t-1] = torch.linalg.norm(v)
     
