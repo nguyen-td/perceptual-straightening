@@ -4,9 +4,18 @@ close all; clear all; clc;
 
 %% global constants
 ExpParam.numFrames  = 11;
-ExpParam.avgLocCurv = 20;
 ExpParam.numTrials  = 1000; 
-ExpParam.numDim     = 10; % dimensionality of the perceptual space
+ExpParam.numDim     = 2; % dimensionality of the perceptual space
+
+d_mu = 1.5; 
+d_sigma = 0.5;
+% min_length = 1; max_length = 1.5; %longer length = better performance
+
+c_mu = 30;
+c_sigma = 5;
+
+a_mu = 0;
+a_sigma = .9; % needs to be bound between [0, 1], concentrated around a circle
 
 %% generate a perceptual trajectory of N frames
 v_0              = ones(1,ExpParam.numDim)'; % first vector at t0
@@ -15,38 +24,75 @@ unit             = @(vec) vec/sqrt(sum(vec.^2));
 
 % define a length range for all vectors and assign a random length to each
 % vector
-min_length = 1; max_length = 1.5; %longer length = better performance
-lengths    = (max_length - min_length) * rand(1,ExpParam.numFrames) + min_length;
+ExpParam.d = abs(normrnd(d_mu, d_sigma, [ExpParam.numFrames - 1, 1]));
 
 % local curvature is sampled from a normal dist centered on the avgLocCurv
-sigma_curv            = 10;
-ExpParam.thetas       = abs(deg2rad(normrnd(ExpParam.avgLocCurv,sigma_curv,[ExpParam.numFrames,1])));
+% sigma_curv            = 10;
+ExpParam.c       = abs(deg2rad(normrnd(c_mu,c_sigma,[ExpParam.numFrames - 1,1])));
 
 % randomly assign the direction of local curvature (clockwise or counterclockwise)
-cw_ccw_order = randi([0, 1], 1, ExpParam.numFrames);
+% cw_ccw_order = randi([0, 1], 1, ExpParam.numFrames);
 
-% generate the vectors
-for i = 1:ExpParam.numFrames
-    % local curvature
-    theta = ExpParam.thetas(i);
-    % define the rotation plane
-    rotPlane = randsample(ExpParam.numDim, 2);
-    % get the cw/ccw rotation matrices
-    [cwR,ccwR] = rotmat(ExpParam.numDim,theta,rotPlane);
-    % calculate the next vector by rotating the previous vector and moving
-    % it to the head of the previous vector
-    if i == 1
-        ExpParam.vectors(:,i) = lengths(i) * unit(v_0);
-    else
-        if cw_ccw_order(i) == 1
-            ExpParam.vectors(:,i) = lengths(i) * unit(cwR * ExpParam.vectors(:,i-1))...
-                + ExpParam.vectors(:,i-1);
-        else
-            ExpParam.vectors(:,i) = lengths(i) * unit(ccwR * ExpParam.vectors(:,i-1))...
-                + ExpParam.vectors(:,i-1);
-        end
-    end
+ExpParam.a = normrnd(a_mu, a_sigma, [ExpParam.numDim, ExpParam.numFrames - 1]);
+
+% % generate the vectors
+% for i = 1:ExpParam.numFrames
+%     % local curvature
+%     theta = ExpParam.thetas(i);
+%     % define the rotation plane
+%     rotPlane = randsample(ExpParam.numDim, 2);
+%     % get the cw/ccw rotation matrices
+%     [cwR,ccwR] = rotmat(ExpParam.numDim,theta,rotPlane);
+%     % calculate the next vector by rotating the previous vector and moving
+%     % it to the head of the previous vector
+%     if i == 1
+%         ExpParam.vectors(:,i) = lengths(i) * unit(v_0);
+%     else
+%         if cw_ccw_order(i) == 1
+%             ExpParam.vectors(:,i) = lengths(i) * unit(cwR * ExpParam.vectors(:,i-1))...
+%                 + ExpParam.vectors(:,i-1);
+%         else
+%             ExpParam.vectors(:,i) = lengths(i) * unit(ccwR * ExpParam.vectors(:,i-1))...
+%                 + ExpParam.vectors(:,i-1);
+%         end
+%     end
+% end
+
+% generate perceptual trajectory
+v_hat = zeros(ExpParam.numDim, ExpParam.numFrames - 1);
+v_hat(1,1) = 1;
+
+% Step 1: get normalized displacement vector
+for t = 2:ExpParam.numFrames - 1
+    
+    ExpParam.a(:, t-1) = ExpParam.a(:, t-1) / norm(ExpParam.a(:, t-1));
+    
+    % [Q, R] = qr([v_hat(:, t-1), ExpParam.a(:, t-1)]);
+    % a_hat_qr = Q(:, 2);
+    % assert(abs(v_hat(:, t-1)' * a_hat_qr) <= 10^-6)
+    a_hat_qr = ExpParam.a(:, t-1);
+    
+    v_hat(:, t) = cos(ExpParam.c(t-1)) * v_hat(:, t-1) + sin(ExpParam.c(t-1)) * a_hat_qr; 
+    v_hat(:, t) = v_hat(:, t) / norm(v_hat(:, t));    
 end
+
+% Step 2: Get displacement vector and perceptual coordinates
+v = zeros(ExpParam.numDim, ExpParam.numFrames - 1);
+for t = 1:ExpParam.numFrames - 1
+    v(:, t) = ExpParam.d(t) * v_hat(:, t);
+end
+
+% Step 3: Get perceptual locations
+x = zeros(ExpParam.numDim, ExpParam.numFrames);
+for t = 1:ExpParam.numFrames - 1
+    x(:, t+1) = x(:, t) + v(:, t);
+end
+
+
+plot(x(1, :), x(2, :), 'ko-', 'markersize', 12, 'markerfacecolor', [1 0 0], 'linewidth', 1), hold on, box off, axis square
+axis([0 15 0 15])
+
+pause
 
 %% run PCA for dimensionality reduction
 pc_coeff = pca(ExpParam.vectors);
