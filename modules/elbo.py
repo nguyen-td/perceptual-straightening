@@ -20,12 +20,32 @@ class ELBO(nn.Module):
     ------
     N: Scalar
         Number of nodes
-    d_post_init: (N-1) torch tensor
-        Initial values for the mean of the posterior distributions around d
-    c_post_init: (N-1) torch tensor
-        Initial values for the means of the posterior distributions around c
-    a_post_init: (N-1, N-1) torch tensor
-        Initial values for the means of the posterior distributions around a
+    mu_prior_d_init: Scalar torch tensor
+        Initial value for the mean of the prior distribution around d
+    mu_prior_c_init: Scalar torch tensor
+        Initial value for the mean of the posterior distribution around c
+    mu_prior_a_init: (N - 1) torch tensor
+        Initial value for the mean of the posterior distribution around a
+    mu_prior_l_init: Scalar torch tensor
+        Initial value for the mean of the posterior distribution around lambda
+    sigma_prior_d_init: [1] torch tensor
+        Initial value for the variance of the prior distribution around d
+    sigma_prior_c_init: [1] torch tensor
+        Initial value for the variance of the prior distribution around c
+    sigma_prior_a_init: (N - 1) torch tensor
+        Initial value for the variance of the prior distribution around a
+    sigma_prior_l_init: [1] torch tensor
+        Initial value for the variance of the prior distribution around lambda
+    mu_post_d_init: (N - 1) torch tensor 
+        Initial value for the mean of the posterior distribution around d
+    mu_post_c_init: (N - 2) torch tensor
+        Initial value for the mean of the posterior distribution around c
+    mu_post_a_init: (N - 2) x (N - 1) torch tensor
+        Initial value for the mean of the posterior distribution around a
+    mu_post_l_init: [1] torch tensor
+        Initial value for the mean of the posterior distribution around lambda
+    sigma_post_init: (M x M) torch tensor, where M = (N - 1) + (N - 2) + (N - 2)*(N - 1) + 1
+        Initial values for the covariance matrix of the posterior distribution
     eps: Scalar (default: 1e-6)
         Regularization factor to ensure numerical stability for computing the Cholesky decomposition
     """
@@ -53,7 +73,7 @@ class ELBO(nn.Module):
         self.eps = eps
 
         # initialize means of the prior
-        self.mu_prior_d = nn.Parameter(mu_prior_d_init)
+        self.mu_prior_d = nn.Parameter(self._transform(mu_prior_d_init, 'd'))
         # self.mu_prior_d = nn.Parameter(torch.rand(1))
         # self.mu_prior_d = nn.Parameter(torch.mean(d_post_init, dim=0, keepdim=True)) 
         # self.mu_prior_d = nn.Parameter(torch.tensor([0.2]))
