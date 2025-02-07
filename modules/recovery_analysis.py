@@ -47,7 +47,7 @@ def compute_curvature(x, N):
 
     return c, d, a
 
-def direct_estimation(sim_dir, n_traj, n_frames=4, n_dim=3, n_iterations=1000, n_trials=1000, sim_curvature=None, isdegree=False):
+def direct_estimation(sim_dir, n_frames=4, n_dim=3, n_iterations=1000, n_trials=1000, sim_curvature=None, isdegree=False):
     """
     Two-step greedy curvature estimation using maximum likelihood estimation for recovery analysis, where L(n,m | x) is the likelihood function. The ground truth curvatures are generated randomly. 
 
@@ -55,8 +55,6 @@ def direct_estimation(sim_dir, n_traj, n_frames=4, n_dim=3, n_iterations=1000, n
     -------
     sim_dir: String
         String containing the path were the MATLAB simulation_py.mat script is located
-    n_traj: Scalar
-        Number of simulated trajectories
     n_frames: Scalar
         Number of frames
     n_dim: Scalar
@@ -93,14 +91,14 @@ def direct_estimation(sim_dir, n_traj, n_frames=4, n_dim=3, n_iterations=1000, n
     os.chdir(sim_dir)
     # call MATLAB function to create trajectory
 
-    c_est = torch.zeros(n_traj)
+    c_est = torch.tensor([0])
     if not isinstance(sim_curvature, (int, float)):
         c_true = torch.rad2deg(torch.rand(1) * (torch.pi)) 
     else:
         c_true = torch.zeros(1) + sim_curvature
-    c = torch.zeros(n_traj, n_frames-2)
-    a = torch.zeros(n_traj, n_frames-2, n_frames-1)
-    d = torch.zeros(n_traj, n_frames-1)
+    c = torch.zeros(n_frames-2)
+    a = torch.zeros(n_frames-2, n_frames-1)
+    d = torch.zeros(n_frames-1)
 
     eng = matlab.engine.start_matlab()
     ExpParam, Data, Pc_reshaped = eng.simulation_py(int(c_true.item()), n_frames, n_dim, n_trials, nargout=3)
@@ -117,36 +115,34 @@ def direct_estimation(sim_dir, n_traj, n_frames=4, n_dim=3, n_iterations=1000, n
 
     print(f'Proportion of correct responses: {torch.sum(trial_mat) / torch.numel(trial_mat)}')
 
-    for i_traj in range(n_traj):
-        # initialize parameters
-        N = n_frames
-        l = 0.06 # lambda
-        x = nn.Parameter(torch.rand(1, N, N - 1) + 1.5) # range: [1, 2.5]
+    # initialize parameters
+    N = n_frames
+    l = 0.06 # lambda
+    x = nn.Parameter(torch.rand(1, N, N - 1) + 1.5) # range: [1, 2.5]
 
-        # set up optimizer
-        lr = 1e-4
-        optimizer = torch.optim.SGD([{'params': x}], lr=lr)
+    # set up optimizer
+    lr = 1e-4
+    optimizer = torch.optim.SGD([{'params': x}], lr=lr)
 
-        # run optimization
-        loss = np.zeros(n_iterations)
-        for i in range(n_iterations):
-            log_ll = -torch.sum(log_likelihood(N, trial_mat, pair_inds, x, l))
+    # run optimization
+    loss = np.zeros(n_iterations)
+    for i in range(n_iterations):
+        log_ll = -torch.sum(log_likelihood(N, trial_mat, pair_inds, x, l))
 
-            # gradient update
-            log_ll.backward()
-            optimizer.step()
-            optimizer.zero_grad()
+        # gradient update
+        log_ll.backward()
+        optimizer.step()
+        optimizer.zero_grad()
 
-            ## save error
-            # loss[i] = log_ll.item()
+        ## save error
+        # loss[i] = log_ll.item()
 
-            # if not i % 50:
-            #     print(f"Epoch: {i}, Loss: {loss[i]}")
-        
-        # c[i_traj], a[i_traj], d[i_traj] = compute_curvature(x, N)
-        c[i_traj], d[i_traj], a[i_traj] = compute_curvature(x, N)
-        c_est[i_traj] = torch.mean(c[i_traj])
-        print(f"Trajectory: {i_traj}")
+        # if not i % 50:
+        #     print(f"Epoch: {i}, Loss: {loss[i]}")
+    
+    # c[i_traj], a[i_traj], d[i_traj] = compute_curvature(x, N)
+    c, d, a = compute_curvature(x, N)
+    c_est = torch.mean(c)
 
     if isdegree:
         c_est = torch.rad2deg(c_est)
