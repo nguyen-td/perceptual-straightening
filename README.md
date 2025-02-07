@@ -72,7 +72,7 @@ $$
 ## Choice of the prior and posterior
 To avoid ambiguity, vectors and matrices are now denoted using **bold** letters.
 
-Both the prior and posterior are chosen to follow a Gaussian distribution. As such, we have a prior $p_{\boldsymbol{\theta}}(\boldsymbol{z}) = \mathcal{N}(\boldsymbol{\mu}, \boldsymbol{\Sigma})$, where $\boldsymbol{\mu} = \left(\mu_{d^\*}, \mu_{d^\*}, \mu_{\boldsymbol{a}^\*}, \mu_{\lambda^\*}\right)^T$ (note that $\boldsymbol{a}$ is a vector) and 
+Both the prior and posterior are chosen to follow a Gaussian distribution. As such, we have a prior $p_{\boldsymbol{\theta}}(\boldsymbol{z}) = \mathcal{N}(\boldsymbol{\mu}, \boldsymbol{\Sigma})$, where $\boldsymbol{\mu} = \left(\mu_{d^\*}, \mu_{c^\*}, \mu_{\boldsymbol{a}^\*}, \mu_{\lambda^\*}\right)^T$ (note that $\boldsymbol{a}$ is a vector) and 
 
 $$\boldsymbol{\Sigma} = \begin{bmatrix}
 \sigma_{d^\*} & 0   & 0   & 0 \\
