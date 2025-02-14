@@ -14,14 +14,15 @@
 %   a_sigma      - variance of the Gaussian distribution around a
 %
 % Outputs:
-%   Pc_reshaped  - [n_frames x n_frames] performance matrix, contains proportion of correct responses for each pair
-%   reps_mat     - [n_frames x n_frames] matrix of repetitions per condition, containing the number of trials per condition
-%   x            - [n_dim x n_frames] perceptual locations/trajectory
-%   d            - [n_frames - 1] vector of local distances
-%   c            - [n_frames - 2] vector of local curvatures
-%   a            - [n_dim x n_frames] matrix of local accelerations
+%   Pc_reshaped    - [n_frames x n_frames]    performance matrix, contains proportion of correct responses for each pair
+%   num_trials_mat - [n_frames x n_frames]    matrix of repetitions per condition, containing the number of trials per condition
+%   x              - [n_dim x n_frames]       perceptual locations/trajectory
+%   d              - [n_frames - 1]           vector of local distances
+%   c              - [n_frames - 2]           vector of local curvatures
+%   a              - [n_dim x n_frames]       matrix of local accelerations
+%   v_hat          - [n_dim x (n_frames - 1)] normalized displacement vectors
 
-function [Pc_reshaped, resp_mat, x, d, c, a] = simulation(n_frames, n_reps, n_dim, abort_prob, d_mu, d_sigma, c_mu, c_sigma, a_mu, a_sigma)
+function [Pc_reshaped, num_trials_mat, x, d, c_true, c_est, a, v_hat] = simulation(n_frames, n_reps, n_dim, abort_prob, d_mu, d_sigma, c_mu, c_sigma, a_mu, a_sigma)
     
     if n_dim > n_frames
         error('Number of dimensions cannot exceed the number of frames.')
@@ -54,34 +55,7 @@ function [Pc_reshaped, resp_mat, x, d, c, a] = simulation(n_frames, n_reps, n_di
     % generate perceptual trajectory
     v_hat = zeros(ExpParam.numDim, ExpParam.numFrames - 1);
     v_hat(1,1) = 1;
-    
-    c = zeros(1, ExpParam.numFrames - 2);
-    
-    % Step 1: Get normalized displacement vector
-    for t = 2:ExpParam.numFrames - 1
-    
-        proj_a2v = ((ExpParam.a(:, t-1)' * v_hat(:, t-1)) / (v_hat(:, t-1)' * v_hat(:, t-1))) * v_hat(:, t-1);
-        a_hat_orth = ExpParam.a(:, t-1) - proj_a2v;
-        a_hat_orth = a_hat_orth / norm(a_hat_orth);
-        assert(abs(v_hat(:, t-1)' * a_hat_orth) <= 1e-6)
-        
-        v_hat(:, t) = cos(ExpParam.c(t-1)) * v_hat(:, t-1) + sin(ExpParam.c(t-1)) * a_hat_orth; 
-        v_hat(:, t) = v_hat(:, t) / norm(v_hat(:, t));    
-        
-        c(t-1) = acos(v_hat(:, t-1)' * v_hat(:, t));
-    end
-    
-    % Step 2: Get displacement vector and perceptual coordinates
-    v = zeros(ExpParam.numDim, ExpParam.numFrames - 1);
-    for t = 1:ExpParam.numFrames - 1
-        v(:, t) = ExpParam.d(t) * v_hat(:, t);
-    end
-    
-    % Step 3: Get perceptual locations
-    x = zeros(ExpParam.numDim, ExpParam.numFrames);
-    for t = 1:ExpParam.numFrames - 1
-        x(:, t+1) = x(:, t) + v(:, t);
-    end
+    [x, v, c_est, a_orth, v_hat] = compute_trajectory(ExpParam.d, ExpParam.c, ExpParam.a, v_hat, ExpParam.numFrames, ExpParam.numDim);
         
     % Simulate the AXB responses
     % get all pairwise combinations (A,B), X will be identical to A or B
@@ -97,87 +71,47 @@ function [Pc_reshaped, resp_mat, x, d, c, a] = simulation(n_frames, n_reps, n_di
     
     for i = 1:length(ExpParam.all_pairs)
         for j = 1:ExpParam.numReps
-            simA = mvnrnd(mus(:,ExpParam.all_pairs(i,1)),sigma_mat,1); % frame A
-            simB = mvnrnd(mus(:,ExpParam.all_pairs(i,2)),sigma_mat,1); % frame B
-            if rem(j,2) == 0
-                simX = mvnrnd(mus(:,ExpParam.all_pairs(i,1)),sigma_mat,1); %draw from A
-                dist_AX = distance(simA,simX);
-                dist_BX = distance(simB,simX);
-                    if dist_AX < dist_BX 
-                        trial_mat(j,i) = 1; %correct response
-                    else
-                        trial_mat(j,i) = 0; %incorrect response
-                    end
-            else
-                simX = mvnrnd(mus(:,ExpParam.all_pairs(i,2)),sigma_mat,1); %draw from B
-                dist_AX = distance(simA,simX);
-                dist_BX = distance(simB,simX);
-                    if dist_BX < dist_AX  
-                        trial_mat(j,i) = 1; %correct response
-                    else
-                        trial_mat(j,i) = 0; %incorrect response
-                    end
-            end 
+            if (rand(1) > abort_prob / 100) % trials can randomly be aborted
+                simA = mvnrnd(mus(:,ExpParam.all_pairs(i,1)),sigma_mat,1); % frame A
+                simB = mvnrnd(mus(:,ExpParam.all_pairs(i,2)),sigma_mat,1); % frame B
+                if rem(j,2) == 0
+                    simX = mvnrnd(mus(:,ExpParam.all_pairs(i,1)),sigma_mat,1); %draw from A
+                    dist_AX = distance(simA,simX);
+                    dist_BX = distance(simB,simX);
+                        if dist_AX < dist_BX 
+                            trial_mat(j,i) = 1; %correct response
+                        else
+                            trial_mat(j,i) = 0; %incorrect response
+                        end
+                else
+                    simX = mvnrnd(mus(:,ExpParam.all_pairs(i,2)),sigma_mat,1); %draw from B
+                    dist_AX = distance(simA,simX);
+                    dist_BX = distance(simB,simX);
+                        if dist_BX < dist_AX  
+                            trial_mat(j,i) = 1; %correct response
+                        else
+                            trial_mat(j,i) = 0; %incorrect response
+                        end
+                end 
+            end
         end
     end
-            
+
     % calculate proportion correct and number of completed trials
     Pc = NaN(1,length(ExpParam.all_pairs));
-    resp_mat = zeros(1, length(ExpParam.all_pairs));
+    num_trials_mat = zeros(1, length(ExpParam.all_pairs));
     for i = 1:length(ExpParam.all_pairs)
-        Pc(i) = sum(trial_mat(:,i))/ExpParam.numReps; % proportion correct
-        resp_mat(i) = sum(trial_mat(:, i));           % number of trials
+        Pc(i) = nanmean(trial_mat(:,i)); % proportion correct
+        num_trials_mat(i) = sum(isfinite(trial_mat(:, i)));     % number of trials
     end
     Pc_reshaped = reshape(Pc,ExpParam.numFrames,ExpParam.numFrames);
-
-    % abort [abort_prob]% of the trials
-    n_aborted_trials = floor((abort_prob / 100) * sum(resp_mat));
-    rand_cond = randi(numel(resp_mat), n_aborted_trials, 1);
-    aborted_trials = accumarray(rand_cond, 1, [numel(resp_mat), 1]);
-    % aborted_trials = zeros(numel(resp_mat), 1);
-    % count = 0;
-    % for iabort = 1:n_aborted_trials
-    %     rand_cond = randi(n_aborted_trials);
-    %     aborted_trials(rand_cond) = aborted_trials(rand_cond) + 1;
-    %     count = count + 1;
-    % 
-    %     if count >= n_aborted_trials
-    %         break
-    %     end
-    % end
-    resp_mat = resp_mat - aborted_trials';
-    resp_mat = reshape(resp_mat, ExpParam.numFrames, ExpParam.numFrames);
+    num_trials_mat = reshape(num_trials_mat, ExpParam.numFrames, ExpParam.numFrames);
 
     % for saving data
-    d = ExpParam.d;
-    a = ExpParam.a;
-    
-    % % Visualize the simulated data
-    % subplot(1,3,1)
-    % plot(x(1, :), x(2, :), 'ko-', 'markersize', 12, 'markerfacecolor', [1 0 0], 'linewidth', 1)
-    % hold on, box off, axis equal, axis square
-    % 
-    % subplot(1,3,2)
-    % plot(ExpParam.c, c, 'r+', 'linewidth', 1)
-    % hold on, box off, axis square
-    % plot([0 pi], [0 pi], 'k--')
-    % plot(mean(ExpParam.c), mean(c), 'ko', 'MarkerSize', 12, 'markerfacecolor', [0 .5 1])
-    % 
-    % subplot(1,3,3)
-    % imagesc(Pc_reshaped);
-    % hold on, axis square, box off
-    % colormap('gray'); 
-    % cBar = colorbar; 
-    % title(cBar,'Proportion correct'); 
-    % cBar.Ticks = [0.35,1];
-    % xticks([1 ExpParam.numFrames]); yticks([1 ExpParam.numFrames]);
-    % xlim([1 ExpParam.numFrames]); ylim([1 ExpParam.numFrames]);
-    % xlabel('Frame number'); ylabel('Frame number');
-    % titleText = sprintf('Simulated discriminability, %d trials', ExpParam.numReps);
-    % title(titleText);
-    % set(gca, 'FontName', 'Arial');
-    % set(gca, 'FontSize', 12);
-    % 
+    d      = ExpParam.d;
+    a      = a_orth;
+    c_true = ExpParam.c;
+
     % intention = c_mu
     % reality = rad2deg(mean(c))
     % performance = mean(Pc)
