@@ -19,7 +19,7 @@ file_number = 1;
 %% Set parameters 
 
 n_frames = 11;
-n_reps = 10;
+n_reps = 100;
 abort_prob = 10;
 
 % d_mu = 1;
@@ -69,7 +69,7 @@ for iparam_a_sigma = 1:numel(a_sigma)
             
                 end
                 save(fullfile(save_data_path, ['sim_' sprintf('%04d', file_number) '.mat']), 'S')
-                disp('Saved')
+                % disp('Saved')
                 file_number = file_number + 1;
             end
         end

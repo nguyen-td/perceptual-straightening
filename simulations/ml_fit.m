@@ -5,7 +5,7 @@ close all
 clc
 
 addpath(genpath('/Users/nguyentiendung/GitHub/perceptual-straightening/'))
-load('sim_0001.mat')
+load('sim_0593.mat')
 
 % plot_sim_data(S{1}.x, S{1}.c_true, S{1}.c, S{1}.Pc_reshaped, S{1}.n_reps)
 
@@ -45,7 +45,7 @@ end
 
 %% Plotting
 subplot(2, 3, 1)
-[~, s_true] = pca(S{1}.x');
+s_true = pca(S{1}.x);
 plot(s_true(:, 1), s_true(:, 2), 'ko-', 'markersize', 12, 'markerfacecolor', [1 0 0], 'linewidth', 1)
 title('Ground truth trajectory')
 hold on, box off, axis square, axis equal
@@ -66,7 +66,7 @@ set(gca, 'FontName', 'Arial');
 set(gca, 'FontSize', 12);
 
 subplot(2, 3, 4)
-[~, s_fit] = pca(x_fit');
+s_fit = pca(x_fit);
 plot(s_fit(:, 1), s_fit(:, 2), 'ko-', 'markersize', 12, 'markerfacecolor', [0 1 0], 'linewidth', 1)
 title('Estimated trajectory')
 hold on, box off, axis square, axis equal

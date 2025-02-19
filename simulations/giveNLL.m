@@ -24,7 +24,7 @@ function [NLL, x, probCor, c] = giveNLL(paramVec, S)
             d(ir, ic) = distance(x(:,ir), x(:, ic));
         end
     end
-
+    
     % Get predicted probability correct
     probCor = normcdf(d./sqrt(2)) .* normcdf(d ./ 2) + normcdf(-d./sqrt(2)) .* normcdf(-d ./ 2);
         
