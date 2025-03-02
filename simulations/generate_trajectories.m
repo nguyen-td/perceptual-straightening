@@ -11,10 +11,12 @@ save_data_path = '/Users/nguyentiendung/GitHub/perceptual-straightening/data';
 %% Set trajectory generation settings
 
 % number of simulations for a fixed set of parameter combinations
-n_sims_per_param = 100; 
+n_sims_per_param = 1; 
 
 % determines the first file number, e.g., if 15, the first script is saved as 'sim_015.mat'
-file_number = 1; 
+file_number = 1082;
+
+% files from 1082 are simulated with 100 trials
 
 %% Set parameters 
 
