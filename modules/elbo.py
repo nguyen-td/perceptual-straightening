@@ -79,7 +79,8 @@ class ELBO(nn.Module):
         self.eps = eps
 
         # initialize means of the prior
-        self.mu_prior_d = nn.Parameter(self._transform(mu_prior_d_init, 'd'))
+        # self.mu_prior_d = nn.Parameter(self._transform(mu_prior_d_init, 'd'))
+        self.mu_prior_d = nn.Parameter(mu_prior_d_init)
         self.mu_prior_c = nn.Parameter(mu_prior_c_init)
         self.mu_prior_a = nn.Parameter(mu_prior_a_init, requires_grad=False)
         self.mu_prior_l = nn.Parameter(mu_prior_l_init, requires_grad=False)
@@ -142,7 +143,6 @@ class ELBO(nn.Module):
         """
 
         prior, posterior = self._make_prior_posterior()
-        # kl = D.kl_divergence(posterior, prior)
         kl = torch.sum(D.kl_divergence(posterior, prior))
         return kl
 
@@ -239,13 +239,11 @@ class ELBO(nn.Module):
 
         # transform variables (note: a is not transformed here yet because it depends on previous displacement vector; 
         # will be transformed during trajectory generation)
-        d = self._transform(d, 'd')
-        l = self._transform(l, 'l')
-        c = self._transform(c, 'c')
+        # d = self._transform(d, 'd')
+        # l = self._transform(l, 'l')
+        # c = self._transform(c, 'c')
 
         # construct trajectory
-        # x = self.construct_trajectory(d, c, a)
-        # log_ll = log_likelihood(self.n_frames, trial_mat, pair_inds, x, l)
         x, _, _, _, _ = compute_trajectory(n_samples, self.n_frames, self.n_dim, d, c, a)
 
         # get perceptual distances
