@@ -66,7 +66,6 @@ def optimize_ML(n_dim, n_corr_obs, n_total_obs, lr=1e-4, n_iter=1000, verbose=Tr
         p = (1 - 2 * l) * p_axb.clone() + l
         return -torch.sum((torch.tensor(n_corr_obs) * torch.log(p.clone())) + (torch.tensor(n_total_obs) - torch.tensor(n_corr_obs)) * torch.log(1 - p.clone()))
 
-
     # run optimization using a multistart procedure
     old_loss = 10e10
 
@@ -131,7 +130,8 @@ def optimize_ML(n_dim, n_corr_obs, n_total_obs, lr=1e-4, n_iter=1000, verbose=Tr
 
 def optimize_ELBO(n_dim, n_corr_obs, n_total_obs, n_samples=100, lr=1e-4, eps=1e-6, n_iter=1000, verbose=True, n_starts=10):
     """
-    Run optimizer to minimize ELBO to estimate perceptual trajectories from perceptual observations. 
+    Run optimizer to minimize ELBO to estimate perceptual trajectories from perceptual observations. Note that in all cases, sigma 
+    denotes the variance/covariance matrix and NOT the standard deviation. Essentially, it is sigma**2.
 
     Inputs:
     -------
@@ -198,7 +198,7 @@ def optimize_ELBO(n_dim, n_corr_obs, n_total_obs, n_samples=100, lr=1e-4, eps=1e
         posterior = D.MultivariateNormal(mu_post, scale_tril=L_post)
 
         # use reparameterization trick (cf. Kingma and Welling, 2022) to sample from approximate distribution
-        z_q = posterior.rsample(sample_shape=(n_samples, )) # shape: (n_samples x (n_frames - 1) + (n_frames - 2) + (n_dim * (n_frames - 2) + 1))
+        z_q = posterior.rsample(sample_shape=(n_samples, )) # shape: (n_samples x (n_frames - 1) + (n_frames - 2) + (n_dim * (n_frames - 2) + 1)) # TODO: something is wrong with z_q
 
         # define trajectory variables
         d_size = n_frames - 1
@@ -227,28 +227,30 @@ def optimize_ELBO(n_dim, n_corr_obs, n_total_obs, n_samples=100, lr=1e-4, eps=1e
         kl = torch.sum(D.kl_divergence(posterior, prior))
 
         # compute ELBO
-        elbo = -(log_ll - kl).detach().numpy()
+        elbo = -(log_ll - kl)
 
         return elbo, x, c_est, p, c, d, a
 
 
     def func_ELBO(vec):
         # unpack variables
-        mu_prior_d    = vec[0]
-        mu_prior_c    = vec[1]
-        sigma_prior_d = vec[2]
-        sigma_prior_c = vec[3]
-        sigma_prior_a = vec[4 + len(sigma_prior_a_init)]
-        mu_post_d     = vec[4 + len(sigma_prior_a_init) : 4 + len(sigma_prior_a_init) + len(mu_post_d_init)]
-        mu_post_c     = vec[4 + len(sigma_prior_a_init) + len(mu_post_d_init) : 4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init)]
-        mu_post_a     = vec[4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) : 4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten())]
-        mu_post_l     = vec[4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten()) : 4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten()) + 1]
-        sigma_post    = vec[4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten()) + 1:]
+        mu_prior_d    = torch.tensor(vec[0]).to(torch.float32)
+        mu_prior_c    = torch.tensor(vec[1]).to(torch.float32)
+        sigma_prior_d = torch.tensor(vec[2]).to(torch.float32)
+        sigma_prior_c = torch.tensor(vec[3]).to(torch.float32)
+        sigma_prior_a = torch.tensor(vec[4: 4 + len(sigma_prior_a_init)]).to(torch.float32)
+
+        mu_post_d     = torch.tensor(vec[4 + len(sigma_prior_a_init) : 4 + len(sigma_prior_a_init) + len(mu_post_d_init)]).to(torch.float32)
+        mu_post_c     = torch.tensor(vec[4 + len(sigma_prior_a_init) + len(mu_post_d_init) : 4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init)]).to(torch.float32)
+        mu_post_a     = torch.tensor(vec[4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) : 4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten())]).to(torch.float32)
+        mu_post_l     = torch.tensor(vec[4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten()) : 4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten()) + 1]).to(torch.float32)
+        sigma_post    = torch.tensor(vec[4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten()) + 1:]).to(torch.float32)
 
         elbo, _, _, _, _, _, _ = prepare_ELBO(mu_prior_d, mu_prior_c, sigma_prior_d, sigma_prior_c, sigma_prior_a, mu_post_d, mu_post_c, mu_post_a, mu_post_l, sigma_post)
-        return elbo.detach.numpy()
+        return elbo.detach().numpy()
 
     # run MLE to initialize posterior distribution
+    print('Running MLE to initialize posterior..........................')
     x, _, p, c, d, a = optimize_ML(n_dim, n_corr_obs, n_total_obs, verbose=True, n_starts=n_starts)
 
     # create initial values
@@ -274,99 +276,90 @@ def optimize_ELBO(n_dim, n_corr_obs, n_total_obs, n_samples=100, lr=1e-4, eps=1e
     sigma_prior_a_init = torch.var(mu_post_a_init, dim=1, correction=False) + torch.mean(sigma_post_init[d_size + c_size:d_size + c_size + a_size])
     sigma_prior_l_init = torch.tensor([1.0], requires_grad=False)
 
-    # create start vectors
+    # create start vector with variables to optimize
     start_vec = torch.hstack((mu_prior_d_init, mu_prior_c_init, sigma_prior_d_init, sigma_prior_c_init, sigma_prior_a_init,
                                 mu_post_d_init, mu_post_c_init, mu_post_a_init.flatten(), mu_post_l_init, sigma_post_init.flatten()))
     
-    LB = np.zeros(np.size(start_vec.detach().numpy()))
-    UB = np.zeros(np.size(start_vec.detach().numpu()))
+    LB = torch.zeros(start_vec.size())
+    UB = torch.zeros(start_vec.size())
 
     # bounds for mu_prior_d
-    LB[0] = 0
-    UB[0] = 3
+    LB[0] = torch.tensor([0.0])
+    UB[0] = torch.tensor([3.0])
 
     # bounds for mu_prior_c
-    LB[1] = 0
-    UB[1] = np.pi
+    LB[1] = torch.tensor([0.0])
+    UB[1] = torch.pi
 
     # bounds for sigma_prior_d
-    LB[2] = 0
-    UB[2] = 5
+    LB[2] = torch.tensor([0.0])
+    UB[2] = torch.tensor([5.0])
 
     # bounds for sigma_prior_c
-    LB[3] = 0
-    UB[3] = np.deg2rad(np.pi)
+    LB[3] = torch.tensor([0.0])
+    UB[3] = torch.pi
 
     # bounds for sigma_prior_a
-    LB[4 : 4 + len(sigma_prior_a_init)] = 0
-    UB[4 : 4 + len(sigma_prior_a_init)] = 5
+    LB[4 : 4 + len(sigma_prior_a_init)] = torch.tensor([0.0])
+    UB[4 : 4 + len(sigma_prior_a_init)] = torch.tensor([5.0])
 
     # bounds for mu_post_d
-    LB[4 + len(sigma_prior_a_init) : 4 + len(sigma_prior_a_init) + len(mu_post_d_init)] = 0
-    UB[4 + len(sigma_prior_a_init) : 4 + len(sigma_prior_a_init) + len(mu_post_d_init)] = 5
+    LB[4 + len(sigma_prior_a_init) : 4 + len(sigma_prior_a_init) + len(mu_post_d_init)] = torch.tensor([0.0])
+    UB[4 + len(sigma_prior_a_init) : 4 + len(sigma_prior_a_init) + len(mu_post_d_init)] = torch.tensor([5.0])
 
     # bounds for mu_post_c
-    LB[4 + len(sigma_prior_a_init) + len(mu_post_d_init) : 4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init)] = 0
-    UB[4 + len(sigma_prior_a_init) + len(mu_post_d_init) : 4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init)] = np.pi
+    LB[4 + len(sigma_prior_a_init) + len(mu_post_d_init) : 4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init)] = torch.tensor([0.0])
+    UB[4 + len(sigma_prior_a_init) + len(mu_post_d_init) : 4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init)] = torch.pi
 
     # bounds for mu_post_a
-    LB[4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) : 4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten())] = 0 # debatable
-    UB[4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) : 4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten())] = 5
+    LB[4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) : 4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten())] = torch.tensor([-5.0]) 
+    UB[4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) : 4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten())] = torch.tensor([-5.0])
 
     # bounds for mu_post_l
-    LB[4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten()) : 4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten()) + 1] = 0
-    UB[4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten()) : 4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten()) + 1] = 5
+    LB[4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten()) : 4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten()) + 1] = torch.tensor([0.0]) 
+    UB[4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten()) : 4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten()) + 1] = torch.tensor([5.0])
 
     # bounds for sigma_post
-    LB_sigma_post = np.zeros(len(sigma_post_init))
-    UB_sigma_post = np.zeros(len(sigma_post_init))
+    LB_sigma_post = torch.zeros(len(sigma_post_init))
+    UB_sigma_post = torch.zeros(len(sigma_post_init))
 
-    LB_sigma_post[:len(mu_post_d_init)] = 0
-    UB_sigma_post[:len(mu_post_d_init)] = 5
+    LB_sigma_post[:len(mu_post_d_init)] = torch.tensor([0.0])
+    UB_sigma_post[:len(mu_post_d_init)] = torch.tensor([5.0])
 
-    LB_sigma_post[len(mu_post_d_init) : len(mu_post_d_init) + len(mu_post_c_init)] = 0
-    LB_sigma_post[len(mu_post_d_init) : len(mu_post_d_init) + len(mu_post_c_init)] = np.pi
+    LB_sigma_post[len(mu_post_d_init) : len(mu_post_d_init) + len(mu_post_c_init)] = torch.tensor([0.0]) 
+    UB_sigma_post[len(mu_post_d_init) : len(mu_post_d_init) + len(mu_post_c_init)] = torch.pi
 
-    LB_sigma_post[len(mu_post_d_init) + len(mu_post_c_init) : len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten())] = 0
-    LB_sigma_post[len(mu_post_d_init) + len(mu_post_c_init) : len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten())] = 5
+    LB_sigma_post[len(mu_post_d_init) + len(mu_post_c_init) : len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten())] = torch.tensor([0.0]) 
+    UB_sigma_post[len(mu_post_d_init) + len(mu_post_c_init) : len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten())] = torch.tensor([5.0]) 
 
-    LB_sigma_post[len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten()):] = 0 # lambda
-    LB_sigma_post[len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten()):] = 5 # lambda
+    LB_sigma_post[len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten()):] = torch.tensor([0.0])  # lambda
+    UB_sigma_post[len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten()):] = torch.tensor([5.0])  # lambda
 
     LB[4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten()) + 1:] = LB_sigma_post
     UB[4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten()) + 1:] = UB_sigma_post
 
     # set bounds
-    bnds = np.zeros((np.size(LB), 2))
+    bnds = torch.zeros(len(LB), 2)
     bnds[:, 0] = LB
     bnds[:, 1] = UB
 
-    res = minimize(func_ELBO, start_vec, bounds=tuple(map(tuple, bnds)), options={'maxiter': n_iter, 'disp': False})
-    if res.success:
-        new_loss = res.fun
-        if verbose:
-            print(f'Current loss: {res.fun}')
+    print('')
+    print('Start minimizing ELBO..........................')
+    res = minimize(func_ELBO, start_vec, bounds=tuple(map(tuple, bnds)), options={'maxiter': n_iter, 'disp': True})
 
-        if new_loss < old_loss:
-            # unpack variables
-            mu_prior_d_    = res.x[0]
-            mu_prior_c_    = res.x[1]
-            sigma_prior_d_ = res.x[2]
-            sigma_prior_c_ = res.x[3]
-            sigma_prior_a_ = res.x[4 + len(sigma_prior_a_init)]
-            mu_post_d_     = res.x[4 + len(sigma_prior_a_init) : 4 + len(sigma_prior_a_init) + len(mu_post_d_init)]
-            mu_post_c_     = res.x[4 + len(sigma_prior_a_init) + len(mu_post_d_init) : 4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init)]
-            mu_post_a_     = res.x[4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) : 4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten())]
-            mu_post_l_     = res.x[4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten()) : 4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten()) + 1]
-            sigma_post_    = res.x[4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten()) + 1:]
+    # unpack variables
+    mu_prior_d_    = torch.tensor(res.x[0]).to(torch.float32)
+    mu_prior_c_    = torch.tensor(res.x[1]).to(torch.float32)
+    sigma_prior_d_ = torch.tensor(res.x[2]).to(torch.float32)
+    sigma_prior_c_ = torch.tensor(res.x[3]).to(torch.float32)
+    sigma_prior_a_ = torch.tensor(res.x[4 : 4 + len(sigma_prior_a_init)]).to(torch.float32)
+    mu_post_d_     = torch.tensor(res.x[4 + len(sigma_prior_a_init) : 4 + len(sigma_prior_a_init) + len(mu_post_d_init)]).to(torch.float32)
+    mu_post_c_     = torch.tensor(res.x[4 + len(sigma_prior_a_init) + len(mu_post_d_init) : 4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init)]).to(torch.float32)
+    mu_post_a_     = torch.tensor(res.x[4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) : 4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten())]).to(torch.float32)
+    mu_post_l_     = torch.tensor(res.x[4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten()) : 4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten()) + 1]).to(torch.float32)
+    sigma_post_    = torch.tensor(res.x[4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten()) + 1:]).to(torch.float32)
 
-            _, x, c_est, p, c, d, a = prepare_ELBO(mu_prior_d_, mu_prior_c_, sigma_prior_d_, sigma_prior_c_, sigma_prior_a_, mu_post_d_, mu_post_c_, mu_post_a_, mu_post_l_, sigma_post_)
+    _, x, c_est, p, c, d, a = prepare_ELBO(mu_prior_d_, mu_prior_c_, sigma_prior_d_, sigma_prior_c_, sigma_prior_a_, mu_post_d_, mu_post_c_, mu_post_a_, mu_post_l_, sigma_post_)
 
-            old_loss = new_loss
-            
-            if verbose:
-                print('Loss updated')
-        if verbose:
-            print(f"Iteration {i+1} | Loss: {res.fun}")
 
     return x, c_est, p, c, d, a
