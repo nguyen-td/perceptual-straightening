@@ -5,7 +5,7 @@ close all
 clc
 
 addpath(genpath('/Users/nguyentiendung/GitHub/perceptual-straightening/'))
-load('sim_0134.mat')
+load('sim_0128.mat')
 
 %% Run fitting
 [x_fit, probCor, c] = ml_fit(S);

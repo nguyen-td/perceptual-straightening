@@ -5,23 +5,25 @@ clear;
 close all;
 clc;
 
-addpath('/Users/nguyentiendung/GitHub/perceptual-straightening/simulations')
-save_data_path = '/Users/nguyentiendung/GitHub/perceptual-straightening/data';
+% addpath('/Users/nguyentiendung/GitHub/perceptual-straightening/simulations')
+addpath('/Users/tn22693/GitHub/perceptual-straightening/simulations')
+% save_data_path = '/Users/nguyentiendung/GitHub/perceptual-straightening/data';
+save_data_path = '/Users/tn22693/GitHub/perceptual-straightening/data';
 
 %% Set trajectory generation settings
 
 % number of simulations for a fixed set of parameter combinations
-n_sims_per_param = 1; 
+n_sims_per_param = 100; 
 
 % determines the first file number, e.g., if 15, the first script is saved as 'sim_015.mat'
-file_number = 1082;
+file_number = 1;
 
 % files from 1082 are simulated with 100 trials
 
 %% Set parameters 
 
 n_frames = 11;
-n_reps = 100;
+n_reps = 10;
 abort_prob = 10;
 
 % d_mu = 1;

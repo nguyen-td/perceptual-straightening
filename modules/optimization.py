@@ -5,6 +5,7 @@ from scipy.spatial import distance
 from scipy.stats import norm
 from scipy.optimize import minimize
 import torch.distributions as D
+from pybads import BADS
 
 from modules import compute_trajectory
 from utils import make_positive_definite
@@ -64,10 +65,10 @@ def optimize_ML(n_dim, n_corr_obs, n_total_obs, lr=1e-4, n_iter=1000, verbose=Tr
         normal = torch.distributions.Normal(torch.tensor([0.0]), torch.tensor([1.0])) # cdf of the standard normal
         p_axb = normal.cdf(dist / np.sqrt(2)) * normal.cdf(dist / 2) + normal.cdf(-dist / np.sqrt(2)) * normal.cdf(-dist / 2)
         p = (1 - 2 * l) * p_axb.clone() + l
-        return -torch.sum((torch.tensor(n_corr_obs) * torch.log(p.clone())) + (torch.tensor(n_total_obs) - torch.tensor(n_corr_obs)) * torch.log(1 - p.clone()))
+        return -torch.sum((torch.tensor(n_corr_obs) * torch.log(p.clone())) + (torch.tensor(n_total_obs) - torch.tensor(n_corr_obs)) * torch.log(1 - p.clone())).detach().numpy()
 
     # run optimization using a multistart procedure
-    old_loss = 10e10
+    old_loss = np.array([10e10])
 
     for i in range(n_starts):
 
@@ -98,17 +99,27 @@ def optimize_ML(n_dim, n_corr_obs, n_total_obs, lr=1e-4, n_iter=1000, verbose=Tr
         bnds[:, 0] = LB
         bnds[:, 1] = UB
 
-        res = minimize(func_NLL, start_vec, bounds=tuple(map(tuple, bnds)), options={'maxiter': n_iter, 'disp': False})
-        if res.success:
-            new_loss = res.fun
+        # res = minimize(func_NLL, start_vec, bounds=tuple(map(tuple, bnds)), options={'maxiter': n_iter, 'disp': False})
+        inf_vec = np.zeros(np.size(start_vec)) + np.inf
+        # bads = BADS(func_NLL, start_vec, -inf_vec, inf_vec, LB, UB, options={'max_iter': n_iter, 'display': 'iter'})
+        bads = BADS(func_NLL, start_vec, LB, UB, LB, UB, options={'max_iter': n_iter, 'display': 'iter'})
+        res = bads.optimize()
+        # if res.success:
+        if res['success']:
+            # new_loss = res.fun
+            new_loss = res['fval']
             if verbose:
-                print(f'Current loss: {res.fun}')
+                # print(f'Current loss: {res.fun}')
+                print(f'Current loss: {res['fval']}')
 
             if new_loss < old_loss:
                 # reconstruct trajectory
-                c = torch.tensor(res.x[:n_frames - 2]).unsqueeze(0)
-                d = torch.tensor(res.x[n_frames-2:n_frames-2 + n_frames-1]).unsqueeze(0)
-                a = torch.tensor(res.x[n_frames-2 + n_frames-1:].reshape(n_dim, n_frames - 2)).unsqueeze(0)
+                # c = torch.tensor(res.x[:n_frames - 2]).unsqueeze(0)
+                # d = torch.tensor(res.x[n_frames-2:n_frames-2 + n_frames-1]).unsqueeze(0)
+                # a = torch.tensor(res.x[n_frames-2 + n_frames-1:].reshape(n_dim, n_frames - 2)).unsqueeze(0)
+                c = torch.tensor(res['x'][:n_frames - 2]).unsqueeze(0)
+                d = torch.tensor(res['x'][n_frames-2:n_frames-2 + n_frames-1]).unsqueeze(0)
+                a = torch.tensor(res['x'][n_frames-2 + n_frames-1:].reshape(n_dim, n_frames - 2)).unsqueeze(0)
                 x, _, c_est, _, _ = compute_trajectory(1, n_frames, n_dim, d, c, a)
 
                 # get perceptual distances
@@ -124,7 +135,8 @@ def optimize_ML(n_dim, n_corr_obs, n_total_obs, lr=1e-4, n_iter=1000, verbose=Tr
                 if verbose:
                     print('Loss updated')
         if verbose:
-            print(f"Iteration {i+1} | Loss: {res.fun}")
+            # print(f"Iteration {i+1} | Loss: {res.fun}")
+            print(f"Iteration {i+1} | Loss: {res['fval']}")
 
     return x, c_est, p, c, d, a
 
