@@ -39,11 +39,12 @@ def make_positive_definite(A, eps):
         Lower triangular matrix such that A = LL^H
     """
 
-    A = A @ A.t().conj() + eps * torch.eye(A.shape[0]) 
+    A = A @ A.T.conj() + eps * torch.eye(A.shape[0]) 
+    # A = A @ A.mT + eps 
     L, info = torch.linalg.cholesky_ex(A)
-    # if info != 0:
-    #     raise ValueError("Cholesky decomposition failed, matrix may not be positive definite.")
-    # assert torch.all(torch.diag(L) > 0), "Cholesky factor has non-positive diagonal entries."
+    if info != 0:
+        raise ValueError("Cholesky decomposition failed, matrix may not be positive definite.")
+    assert torch.all(torch.diag(L) > 0), "Cholesky factor has non-positive diagonal entries."
 
     return A, L
 

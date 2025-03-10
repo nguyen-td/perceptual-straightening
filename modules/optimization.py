@@ -99,7 +99,7 @@ def optimize_ML(n_dim, n_corr_obs, n_total_obs, lr=1e-4, n_iter=1000, verbose=Tr
         bnds[:, 0] = LB
         bnds[:, 1] = UB
 
-        res = minimize(func_NLL, start_vec, bounds=tuple(map(tuple, bnds)), options={'maxiter': n_iter, 'disp': False})
+        res = minimize(func_NLL, start_vec, bounds=tuple(map(tuple, bnds)), options={'maxiter': n_iter, 'disp': True})
         # inf_vec = np.zeros(np.size(start_vec)) + np.inf
         # bads = BADS(func_NLL, start_vec, -inf_vec, inf_vec, LB, UB, options={'max_iter': n_iter, 'display': 'iter'})
         # bads = BADS(func_NLL, start_vec, LB, UB, LB, UB, options={'max_iter': n_iter, 'display': 'iter'})
@@ -190,25 +190,23 @@ def optimize_ELBO(n_dim, n_corr_obs, n_total_obs, n_samples=100, lr=1e-4, eps=1e
         mu_prior = torch.cat((transform(mu_prior_d, 'd').repeat(n_frames - 1), 
                               mu_prior_c.repeat(n_frames - 2), 
                               mu_prior_a_init.repeat((n_frames - 2)), 
-                              mu_prior_l_init), 0)
+                              transform(mu_prior_l_init, 'l')), 0)
         sigma_prior = torch.block_diag(torch.diag(sigma_prior_d.repeat(n_frames - 1)), 
                                        torch.diag(sigma_prior_c.repeat(n_frames - 2)), 
                                        torch.diag(sigma_prior_a.repeat(n_frames - 2)), 
                                        torch.diag(sigma_prior_l_init))
-        _, L_prior = make_positive_definite(sigma_prior, eps)
-        prior = D.MultivariateNormal(mu_prior, scale_tril=L_prior)
 
         # define means and covariances of the posterior
-        mu_post = torch.cat((transform(mu_post_d, 'd'), mu_post_c, mu_post_a.flatten(), mu_post_l))
-        _, L_post = make_positive_definite(sigma_post, eps)
+        mu_post = torch.cat((transform(mu_post_d, 'd'), mu_post_c, mu_post_a.flatten(), transform(mu_post_l, 'l')))
+        A_post, L_post = make_positive_definite(torch.diag(sigma_post), eps)
         posterior = D.MultivariateNormal(mu_post, scale_tril=L_post)
+        # posterior = D.MultivariateNormal(mu_post, covariance_matrix=A_post)
 
         # define distributions
-        _, L_prior = make_positive_definite(sigma_prior, eps)
+        A_prior, L_prior = make_positive_definite(sigma_prior, eps)
         prior = D.MultivariateNormal(mu_prior, scale_tril=L_prior)
-        _, L_post = make_positive_definite(sigma_post_init, eps)
-        posterior = D.MultivariateNormal(mu_post, scale_tril=L_post)
-
+        # prior = D.MultivariateNormal(mu_prior, scale_tril=A_prior)
+       
         # use reparameterization trick (cf. Kingma and Welling, 2022) to sample from approximate distribution
         z_q = posterior.rsample(sample_shape=(n_samples, )) # shape: (n_samples x (n_frames - 1) + (n_frames - 2) + (n_dim * (n_frames - 2) + 1)) # TODO: something is wrong with z_q
 
@@ -234,20 +232,12 @@ def optimize_ELBO(n_dim, n_corr_obs, n_total_obs, n_samples=100, lr=1e-4, eps=1e
         p_axb = normal.cdf(dist / np.sqrt(2)) * normal.cdf(dist / 2) + normal.cdf(-dist / np.sqrt(2)) * normal.cdf(-dist / 2)
         p = (1 - 2 * l[:, None, None]) * p_axb.clone() + l[:, None, None]
 
-        p_eps = 1e-8  # Small constant to prevent log(0)
+        p_eps = 1e-8  # small constant to prevent log(0)
         p = torch.clamp(p, p_eps, 1 - p_eps)
         log_ll = torch.mean(torch.sum((torch.tensor(n_corr_obs) * torch.log(p.clone())) + (torch.tensor(n_total_obs) - torch.tensor(n_corr_obs)) * torch.log(1 - p.clone()), dim=[1, 2]))
 
         # compute KL divergence
         kl = torch.sum(D.kl_divergence(posterior, prior))
-
-
-        p_eps = 1e-8
-        p = torch.tensor([0.5, 1.0], dtype=torch.float32)
-
-        print("Before clamping:", p)
-        p = torch.clamp(p, p_eps, 1 - p_eps)
-        print("After clamping:", p)
 
         # compute ELBO
         elbo = -(log_ll - kl)
@@ -284,7 +274,7 @@ def optimize_ELBO(n_dim, n_corr_obs, n_total_obs, n_samples=100, lr=1e-4, eps=1e
     mu_post_a_init = a.squeeze()
     mu_post_l_init = torch.tensor([0.0])
     mu_post_inits = torch.hstack((mu_post_d_init, mu_post_c_init, mu_post_a_init.flatten(), mu_post_l_init)).unsqueeze(1)
-    sigma_post_init = torch.diag(mu_post_inits @ mu_post_inits.T) # try diagonal matrix
+    sigma_post_init = torch.diag(mu_post_inits @ mu_post_inits.T) # try diagonal matrix, this is just a vector of diagonals!
 
     mu_prior_d_init = torch.tensor([1.0])
     mu_prior_c_init = torch.deg2rad(torch.tensor(60))
@@ -368,7 +358,7 @@ def optimize_ELBO(n_dim, n_corr_obs, n_total_obs, n_samples=100, lr=1e-4, eps=1e
 
     print('')
     print('Start minimizing ELBO..........................')
-    res = minimize(func_ELBO, start_vec, bounds=tuple(map(tuple, bnds)), options={'maxiter': n_iter, 'disp': True})
+    res = minimize(func_ELBO, start_vec, bounds=tuple(map(tuple, bnds)), options={'maxiter': n_iter, 'disp': verbose})
 
     # unpack variables
     mu_prior_d_    = torch.tensor(res.x[0]).to(torch.float32)
@@ -383,9 +373,9 @@ def optimize_ELBO(n_dim, n_corr_obs, n_total_obs, n_samples=100, lr=1e-4, eps=1e
     sigma_post_    = torch.tensor(res.x[4 + len(sigma_prior_a_init) + len(mu_post_d_init) + len(mu_post_c_init) + len(mu_post_a_init.flatten()) + 1:]).to(torch.float32)
 
     _, x, c_est, p, c, d, a = prepare_ELBO(mu_prior_d_, mu_prior_c_, sigma_prior_d_, sigma_prior_c_, sigma_prior_a_, mu_post_d_, mu_post_c_, mu_post_a_, mu_post_l_, sigma_post_)
+    print('Done')
 
-
-    return x, c_est, p, c, d, a
+    return x, c_est, p, c, d, a, mu_prior_c_, mu_post_c_
 
 def transform(x, var):
     """
