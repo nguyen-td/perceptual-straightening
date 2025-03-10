@@ -114,10 +114,10 @@ class ELBO(nn.Module):
         
         """
         # define means and covariances of the prior, extend the dimension of mu and sigma to match those of the posterior
-        mu_prior = torch.cat((self.mu_prior_d.repeat(self.n_frames - 1), 
-                              self.mu_prior_c.repeat(self.n_frames - 2), 
+        mu_prior = torch.cat((self._transform(self.mu_prior_d, 'd').repeat(self.n_frames - 1), 
+                              self._transform(self.mu_prior_c, 'c').repeat(self.n_frames - 2), 
                               self.mu_prior_a.repeat((self.n_frames - 2)), 
-                              self.mu_prior_l), 0)
+                              self._transform(self.mu_prior_l, 'l')), 0)
         sigma_prior = torch.block_diag(torch.diag(self.sigma_prior_d.repeat(self.n_frames - 1)), 
                                        torch.diag(self.sigma_prior_c.repeat(self.n_frames - 2)), 
                                        torch.diag(self.sigma_prior_a.repeat(self.n_frames - 2)), 
@@ -126,7 +126,7 @@ class ELBO(nn.Module):
         prior = D.MultivariateNormal(mu_prior, scale_tril=L_prior)
 
         # define means and covariances of the posterior
-        mu_post = torch.cat((self.mu_post_d, self.mu_post_c, self.mu_post_a.flatten(), self.mu_post_l))
+        mu_post = torch.cat((self._transform(self.mu_post_d, 'd'), self._transform(self.mu_post_c, 'c'), self.mu_post_a.flatten(), self._transform(self.mu_post_l, 'l')))
         _, L_post = make_positive_definite(self.sigma_post, self.eps)
         posterior = D.MultivariateNormal(mu_post, scale_tril=L_post)
         
@@ -239,9 +239,9 @@ class ELBO(nn.Module):
 
         # transform variables (note: a is not transformed here yet because it depends on previous displacement vector; 
         # will be transformed during trajectory generation)
-        # d = self._transform(d, 'd')
-        # l = self._transform(l, 'l')
-        # c = self._transform(c, 'c')
+        d = self._transform(d, 'd')
+        l = self._transform(l, 'l')
+        c = self._transform(c, 'c')
 
         # construct trajectory
         x, _, _, _, _ = compute_trajectory(n_samples, self.n_frames, self.n_dim, d, c, a)
@@ -253,6 +253,9 @@ class ELBO(nn.Module):
         normal = torch.distributions.Normal(torch.tensor([0.0]), torch.tensor([1.0])) # cdf of the standard normal
         p_axb = normal.cdf(dist / np.sqrt(2)) * normal.cdf(dist / 2) + normal.cdf(-dist / np.sqrt(2)) * normal.cdf(-dist / 2)
         p = (1 - 2 * l[:, None, None]) * p_axb.clone() + l[:, None, None]
+        
+        p_eps = 1e-8  # Small constant to prevent log(0)
+        p = torch.clamp(p, p_eps, 1 - p_eps)
         log_ll = torch.sum((torch.tensor(n_corr_obs) * torch.log(p.clone())) + (torch.tensor(n_total_obs) - torch.tensor(n_corr_obs)) * torch.log(1 - p.clone()), dim=[1, 2])
 
         return torch.mean(log_ll), torch.mean(d, dim=0), torch.mean(c, dim=0), torch.mean(a, dim=0), torch.mean(p, dim=0), torch.mean(x, dim=0)

@@ -24,6 +24,7 @@ def orthogonalize_acc(a, v_hat):
     a_hat_orth = a_hat_orth / torch.linalg.norm(a_hat_orth, dim=1)[:, None]
 
     # assert abs(v_hat @ a_hat_orth) <= 1e-4, "Orthogonality check failed"
+    assert all(torch.sum(v_hat * a_hat_orth, dim=-1) <= 1e-4), "Orthogonality check failed"
 
     return a_hat_orth
 

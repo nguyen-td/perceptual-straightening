@@ -99,27 +99,27 @@ def optimize_ML(n_dim, n_corr_obs, n_total_obs, lr=1e-4, n_iter=1000, verbose=Tr
         bnds[:, 0] = LB
         bnds[:, 1] = UB
 
-        # res = minimize(func_NLL, start_vec, bounds=tuple(map(tuple, bnds)), options={'maxiter': n_iter, 'disp': False})
-        inf_vec = np.zeros(np.size(start_vec)) + np.inf
+        res = minimize(func_NLL, start_vec, bounds=tuple(map(tuple, bnds)), options={'maxiter': n_iter, 'disp': False})
+        # inf_vec = np.zeros(np.size(start_vec)) + np.inf
         # bads = BADS(func_NLL, start_vec, -inf_vec, inf_vec, LB, UB, options={'max_iter': n_iter, 'display': 'iter'})
-        bads = BADS(func_NLL, start_vec, LB, UB, LB, UB, options={'max_iter': n_iter, 'display': 'iter'})
-        res = bads.optimize()
+        # bads = BADS(func_NLL, start_vec, LB, UB, LB, UB, options={'max_iter': n_iter, 'display': 'iter'})
+        # res = bads.optimize()
         # if res.success:
         if res['success']:
-            # new_loss = res.fun
-            new_loss = res['fval']
+            new_loss = res.fun
+            # new_loss = res['fval']
             if verbose:
-                # print(f'Current loss: {res.fun}')
-                print(f'Current loss: {res['fval']}')
+                print(f'Current loss: {res.fun}')
+                # print(f'Current loss: {res['fval']}')
 
             if new_loss < old_loss:
                 # reconstruct trajectory
-                # c = torch.tensor(res.x[:n_frames - 2]).unsqueeze(0)
-                # d = torch.tensor(res.x[n_frames-2:n_frames-2 + n_frames-1]).unsqueeze(0)
-                # a = torch.tensor(res.x[n_frames-2 + n_frames-1:].reshape(n_dim, n_frames - 2)).unsqueeze(0)
-                c = torch.tensor(res['x'][:n_frames - 2]).unsqueeze(0)
-                d = torch.tensor(res['x'][n_frames-2:n_frames-2 + n_frames-1]).unsqueeze(0)
-                a = torch.tensor(res['x'][n_frames-2 + n_frames-1:].reshape(n_dim, n_frames - 2)).unsqueeze(0)
+                c = torch.tensor(res.x[:n_frames - 2]).unsqueeze(0)
+                d = torch.tensor(res.x[n_frames-2:n_frames-2 + n_frames-1]).unsqueeze(0)
+                a = torch.tensor(res.x[n_frames-2 + n_frames-1:].reshape(n_dim, n_frames - 2)).unsqueeze(0)
+                # c = torch.tensor(res['x'][:n_frames - 2]).unsqueeze(0)
+                # d = torch.tensor(res['x'][n_frames-2:n_frames-2 + n_frames-1]).unsqueeze(0)
+                # a = torch.tensor(res['x'][n_frames-2 + n_frames-1:].reshape(n_dim, n_frames - 2)).unsqueeze(0)
                 x, _, c_est, _, _ = compute_trajectory(1, n_frames, n_dim, d, c, a)
 
                 # get perceptual distances
@@ -135,8 +135,8 @@ def optimize_ML(n_dim, n_corr_obs, n_total_obs, lr=1e-4, n_iter=1000, verbose=Tr
                 if verbose:
                     print('Loss updated')
         if verbose:
-            # print(f"Iteration {i+1} | Loss: {res.fun}")
-            print(f"Iteration {i+1} | Loss: {res['fval']}")
+            print(f"Iteration {i+1} | Loss: {res.fun}")
+            # print(f"Iteration {i+1} | Loss: {res['fval']}")
 
     return x, c_est, p, c, d, a
 
@@ -187,7 +187,7 @@ def optimize_ELBO(n_dim, n_corr_obs, n_total_obs, n_samples=100, lr=1e-4, eps=1e
     def prepare_ELBO(mu_prior_d, mu_prior_c, sigma_prior_d, sigma_prior_c, sigma_prior_a, mu_post_d, mu_post_c, mu_post_a, mu_post_l, sigma_post):
 
         # define means and covariances of the prior, extend the dimension of mu and sigma to match those of the posterior
-        mu_prior = torch.cat((mu_prior_d.repeat(n_frames - 1), 
+        mu_prior = torch.cat((transform(mu_prior_d, 'd').repeat(n_frames - 1), 
                               mu_prior_c.repeat(n_frames - 2), 
                               mu_prior_a_init.repeat((n_frames - 2)), 
                               mu_prior_l_init), 0)
@@ -199,7 +199,7 @@ def optimize_ELBO(n_dim, n_corr_obs, n_total_obs, n_samples=100, lr=1e-4, eps=1e
         prior = D.MultivariateNormal(mu_prior, scale_tril=L_prior)
 
         # define means and covariances of the posterior
-        mu_post = torch.cat((mu_post_d, mu_post_c, mu_post_a.flatten(), mu_post_l))
+        mu_post = torch.cat((transform(mu_post_d, 'd'), mu_post_c, mu_post_a.flatten(), mu_post_l))
         _, L_post = make_positive_definite(sigma_post, eps)
         posterior = D.MultivariateNormal(mu_post, scale_tril=L_post)
 
@@ -218,10 +218,10 @@ def optimize_ELBO(n_dim, n_corr_obs, n_total_obs, n_samples=100, lr=1e-4, eps=1e
         a_size = (n_dim) * (n_frames - 2)
 
         # extract variables
-        d = z_q[:, :d_size]
+        d = transform(z_q[:, :d_size], 'd')
         c = z_q[:, d_size:d_size + c_size]
         a = z_q[:, d_size + c_size:d_size + c_size + a_size].reshape(-1, n_dim, n_frames - 2)
-        l = z_q[:, -1]
+        l = transform(z_q[:, -1], 'l')
 
         # construct trajectory
         x, _, c_est, _, _ = compute_trajectory(n_samples, n_frames, n_dim, d, c, a)
@@ -233,10 +233,21 @@ def optimize_ELBO(n_dim, n_corr_obs, n_total_obs, n_samples=100, lr=1e-4, eps=1e
         normal = torch.distributions.Normal(torch.tensor([0.0]), torch.tensor([1.0])) # cdf of the standard normal
         p_axb = normal.cdf(dist / np.sqrt(2)) * normal.cdf(dist / 2) + normal.cdf(-dist / np.sqrt(2)) * normal.cdf(-dist / 2)
         p = (1 - 2 * l[:, None, None]) * p_axb.clone() + l[:, None, None]
+
+        p_eps = 1e-8  # Small constant to prevent log(0)
+        p = torch.clamp(p, p_eps, 1 - p_eps)
         log_ll = torch.mean(torch.sum((torch.tensor(n_corr_obs) * torch.log(p.clone())) + (torch.tensor(n_total_obs) - torch.tensor(n_corr_obs)) * torch.log(1 - p.clone()), dim=[1, 2]))
 
         # compute KL divergence
         kl = torch.sum(D.kl_divergence(posterior, prior))
+
+
+        p_eps = 1e-8
+        p = torch.tensor([0.5, 1.0], dtype=torch.float32)
+
+        print("Before clamping:", p)
+        p = torch.clamp(p, p_eps, 1 - p_eps)
+        print("After clamping:", p)
 
         # compute ELBO
         elbo = -(log_ll - kl)
@@ -375,3 +386,49 @@ def optimize_ELBO(n_dim, n_corr_obs, n_total_obs, n_samples=100, lr=1e-4, eps=1e
 
 
     return x, c_est, p, c, d, a
+
+def transform(x, var):
+    """
+    Feed variables through the respective transfer functions.
+
+    Inputs:
+    -------
+    x: Torch tensor
+        Variable to transform
+    var: String
+        Denotes which variable to transform, defined for "d" and "l". "c" is not transformed. For "a", the orthogonalization depends on the previous displacement vector and will therefore be computed during the trajectory construction.
+
+    Output:
+    -------
+    x_trans: Torch tensor
+        Transformed variable
+    """
+
+    def smooth_step_function(x, epsilon=1e-3):   
+        """
+        Differentiable approximation of the following piecewise function: 
+        
+        f(x) = {0 if x < 0
+                pi if x >= pi
+                x otherwise
+                }
+        """
+        s1 = torch.sigmoid(x / epsilon)  # Approximates the step at x=0
+        s2 = torch.sigmoid((torch.pi - x) / epsilon)  # Approximates the step at x=pi
+        
+        # Interpolating between the different regions
+        result = s1 * x * s2 + torch.pi * (1 - s2)
+        return result
+
+    if var == 'd':
+        f = nn.Softplus()
+        y = f(x)
+    elif var == 'l':
+        f = torch.distributions.Normal(torch.tensor([0.0]), torch.tensor([1.0])) 
+        y = 0.06 * f.cdf(x)
+    elif var == 'c':
+        y = smooth_step_function(x)
+    else:
+        raise Exception("Unrecognized value for `var`.")
+
+    return y
