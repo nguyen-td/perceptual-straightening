@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 
 def orthogonalize_acc(a, v_hat):
     """
@@ -85,3 +86,55 @@ def compute_trajectory(n_samples, n_frames, n_dim, d, c, a_init):
         x[:, :, t + 1] = x[:, :, t] + v[:, :, t]
 
     return x, v, c_est, v_hat, a_hat_orth
+
+def compute_hierarchical_ll(n_samples, n_frames, n_dim, n_corr_obs, n_total_obs, d, c, a, l):
+    """
+    Compute the likelihood function from the hierarchical model.
+
+    Inputs:
+    -------
+    n_samples: Scalar
+        Number of samples 
+    n_frames: Scalar
+        Number of frames
+    n_dim: Scalar
+        Number of dimensions
+    n_corr_obs: (n_frames x n_frames) Numpy array
+        Matrix where each entry corresponds to the number of correct observations/choices for the respective frame combination
+    n_total_obs: (n_frames x n_frames) Numpy array
+        Matrix where each entry corresponds to the number of completed trials for the respective frame combination
+    d: (n_samples x n_frames - 1) Torch tensor
+        Distance vector
+    c: (n_samples x n_frames - 2) Torch tensor
+        Curvature vector
+    a: (n_samples x n_dim x n_frames) Torch tensor
+        Initialized acceleration vectors
+    l: (n_samples, ) Torch tensor
+        Guess rate
+
+    Outputs:
+    --------
+    x: (n_samples x n_dim x n_frames) Torch tensor
+        Perceptual locations
+    p: (n_frames x n_frames) Torch tensor
+        Estimated proportion correct
+    log_ll: (n_samples, ) Torch tensor
+        Estimated log likelihood
+    """
+
+    # construct trajectory
+    x, _, _, _, _ = compute_trajectory(n_samples, n_frames, n_dim, d, c, a)
+
+    # get perceptual distances
+    dist = torch.cdist(torch.transpose(x, 1, 2), torch.transpose(x, 1, 2))
+
+    # compute hierarchical model
+    normal = torch.distributions.Normal(torch.tensor([0.0]), torch.tensor([1.0])) # cdf of the standard normal
+    p_axb = normal.cdf(dist / np.sqrt(2)) * normal.cdf(dist / 2) + normal.cdf(-dist / np.sqrt(2)) * normal.cdf(-dist / 2)
+    p = (1 - 2 * l[:, None, None]) * p_axb.clone() + l[:, None, None]
+    
+    p_eps = 1e-8  # Small constant to prevent log(0)
+    p = torch.clamp(p, p_eps, 1 - p_eps)
+    log_ll = torch.sum((torch.tensor(n_corr_obs) * torch.log(p.clone())) + (torch.tensor(n_total_obs) - torch.tensor(n_corr_obs)) * torch.log(1 - p.clone()), dim=[1, 2])
+
+    return x, p, log_ll

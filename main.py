@@ -7,6 +7,7 @@ import scipy.io as spio
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 from modules import optimize_ML, optimize_ELBO
+from modules.elbo import ELBO
 
 import os
 
@@ -23,5 +24,7 @@ n_total_obs = S_list[sim_idx]['num_trials_mat'][0, 0]
 n_frames = S_list[sim_idx]['Pc_reshaped'][0, 0].shape[0]
 n_dim = S_list[sim_idx]['x'][0, 0].shape[0]
 
-optimize_ELBO(n_dim, n_corr_obs, n_total_obs, verbose=True, n_starts=3)
+# optimize_ELBO(n_dim, n_corr_obs, n_total_obs, verbose=True, n_starts=3)
+elbo = ELBO(n_dim, n_corr_obs, n_total_obs, n_starts=1, n_iterations=2)
+elbo.optimize_ELBO_SGD()
 

@@ -2,13 +2,12 @@ import numpy as np
 import torch
 from torch import nn
 from pathlib import Path
-from torchrl.modules.utils import inv_softplus
 import torch.distributions as D
 from scipy.spatial import distance
 from scipy.stats import norm
 
 from utils import make_positive_definite, make_positive_definite_batch, log_likelihood
-from modules import compute_trajectory
+from modules import compute_trajectory, optimize_ML, compute_hierarchical_ll
 
 class ELBO(nn.Module):
     """
@@ -24,81 +23,155 @@ class ELBO(nn.Module):
         Number of nodes/frames
     n_dim: Scalar
         Number of dimensions
-    mu_prior_d_init: Scalar torch tensor
-        Initial value for the mean of the prior distribution around d in d'
-    mu_prior_c_init: Scalar torch tensor
-        Initial value for the mean of the posterior distribution around c in radians
-    mu_prior_a_init: (N - 1) torch tensor
-        Initial value for the mean of the posterior distribution around a in d'
-    mu_prior_l_init: [1] torch tensor
-        Initial value for the mean of the posterior distribution around lambda
-    sigma_prior_d_init: [1] torch tensor
-        Initial value for the variance of the prior distribution around d
-    sigma_prior_c_init: [1] torch tensor
-        Initial value for the variance of the prior distribution around c
-    sigma_prior_a_init: (N - 1) torch tensor
-        Initial value for the variance of the prior distribution around a
-    sigma_prior_l_init: [1] torch tensor
-        Initial value for the variance of the prior distribution around lambda
-    mu_post_d_init: (N - 1) torch tensor 
-        Initial value for the mean of the posterior distribution around d in d'
-    mu_post_c_init: (N - 2) torch tensor
-        Initial value for the mean of the posterior distribution around c in radians
-    mu_post_a_init: (N - 2) x (N - 1) torch tensor
-        Initial value for the mean of the posterior distribution around a in d'
-    mu_post_l_init: [1] torch tensor
-        Initial value for the mean of the posterior distribution around lambda
-    sigma_post_init: (M x M) torch tensor, where M = (N - 1) + (N - 2) + (N - 2)*(N - 1) + 1
-        Initial values for the covariance matrix of the posterior distribution
+    n_corr_obs: (n_frames x n_frames) Numpy array
+        Matrix where each entry corresponds to the number of correct observations/choices for the respective frame combination
+    n_total_obs: (n_frames x n_frames) Numpy array
+        Matrix where each entry corresponds to the number of completed trials for the respective frame combination
+    lr: Scalar
+        Learning rate for optimization algorithm
+    n_iterations: Scalar
+        Number of iterations for optimization
+    n_starts: Scalar
+        Number of multistarts of the maximum likelihood estimation for initializing the posterior distributions
+    n_samples: Scalar
+        Number of trajectories to sample to compute the expected value (in ELBO)
     eps: Scalar (default: 1e-6)
         Regularization factor to ensure numerical stability for computing the Cholesky decomposition
     """
     
-    def __init__(self, 
-                 n_frames, 
+    def __init__(self,  
                  n_dim,
-                 mu_prior_d_init, 
-                 mu_prior_c_init, 
-                 mu_prior_a_init, 
-                 mu_prior_l_init, 
-                 sigma_prior_d_init, 
-                 sigma_prior_c_init, 
-                 sigma_prior_a_init, 
-                 sigma_prior_l_init, 
-                 mu_post_d_init, 
-                 mu_post_c_init, 
-                 mu_post_a_init,
-                 mu_post_l_init, 
-                 sigma_post_init, 
+                 n_corr_obs,
+                 n_total_obs,
+                 lr=1e-4,
+                 n_iterations=20000,
+                 n_starts=10,
+                 n_samples=100,
                  eps=1e-6
                 ):
         super(ELBO, self).__init__()
 
-        self.n_frames = n_frames
         self.n_dim = n_dim
+        self.n_corr_obs = n_corr_obs
+        self.n_total_obs = n_total_obs
+        self.lr = lr
+        self.n_iterations = n_iterations
+        self.n_samples = n_samples
+        self.n_starts = n_starts
+        
         self.eps = eps
 
-        # initialize means of the prior
-        # self.mu_prior_d = nn.Parameter(self._transform(mu_prior_d_init, 'd'))
-        self.mu_prior_d = nn.Parameter(mu_prior_d_init)
-        self.mu_prior_c = nn.Parameter(mu_prior_c_init)
-        self.mu_prior_a = nn.Parameter(mu_prior_a_init, requires_grad=False)
-        self.mu_prior_l = nn.Parameter(mu_prior_l_init, requires_grad=False)
+    def optimize_ELBO_SGD(self):
+        """
+        Runs the complete algorithm to minimize the ELBO using SGD.
 
-        # initialize (diagonal) covariance matrices of the prior
-        self.sigma_prior_d = nn.Parameter(sigma_prior_d_init)
-        self.sigma_prior_c = nn.Parameter(sigma_prior_c_init)
-        self.sigma_prior_a = nn.Parameter(sigma_prior_a_init)
-        self.sigma_prior_l = nn.Parameter(sigma_prior_l_init, requires_grad=False)
+        Outputs:
+        --------
+        x: (n_samples x n_dim x n_frames) Torch tensor
+            Most likely perceptual locations (determined by optimized posterior means)
+        p: (n_frames x n_frames) Torch tensor
+            Most likely estimation of proportion correct (determined by optimized posterior means)
+        errors: (n_iterations, ) Torch tensor
+            ELBO loss over iterations
+        kl_loss: (n_iterations, ) Torch tensor
+            KL-divergence over iterations
+        c_prior: (n_iterations, ) Torch tensor
+            Updates of mu_prior_c over iterations
+        d_prior: (n_iterations, ) Torch tensor
+            Updates of mu_prior_d over iterations
+        l_prior: (n_iterations, ) Torch tensor
+            Updates of mu_prior_l over iterations
+        c_post: (n_frames - 2, n_iterations, ) Torch tensor
+            Updates of mu_post_c over iterations
+        d_post: (n_frames - 1, n_iterations, ) Torch tensor
+            Updates of mu_post_d over iterations
+        l_post: (n_iterations, ) Torch tensor
+            Updates of mu_post_l over iterations
+        """
 
-        # initialize means of (N-1) independent posteriors
-        self.mu_post_d = nn.Parameter(mu_post_d_init)
-        self.mu_post_c = nn.Parameter(mu_post_c_init)
-        self.mu_post_a = nn.Parameter(mu_post_a_init)
-        self.mu_post_l = nn.Parameter(mu_post_l_init)
+        # run MLE to initialize posterior distribution
+        print('Running MLE to initialize posterior..........................')
+        _, _, _, c, d, a = optimize_ML(self.n_dim, self.n_corr_obs, self.n_total_obs, verbose=True, n_starts=self.n_starts)
 
-        # initialize (full) covariance matrix of posterior
-        self.sigma_post = nn.Parameter(sigma_post_init) 
+        # create initial values
+        self.n_frames = self.n_corr_obs.shape[0]
+
+        self.mu_post_d = nn.Parameter(self._transform(d.squeeze(), 'd'))
+        self.mu_post_c = nn.Parameter(c.squeeze())
+        self.mu_post_a = nn.Parameter(a.squeeze())
+        self.mu_post_l = nn.Parameter(self._transform(torch.tensor([0.0]), 'l'))
+        self.mu_post_inits = torch.hstack((self.mu_post_d, self.mu_post_c, self.mu_post_a.flatten(), self.mu_post_l))
+        self.sigma_post = nn.Parameter(torch.eye(len(self.mu_post_inits)))
+
+        self.mu_prior_d = nn.Parameter(self._transform(torch.tensor([1.0]), 'd'))
+        self.mu_prior_c = nn.Parameter(torch.deg2rad(torch.tensor(60)))
+        self.mu_prior_a = nn.Parameter(torch.zeros(self.n_dim), requires_grad=False) 
+        self.mu_prior_l = nn.Parameter(self._transform(torch.tensor([0.0]), 'l'), requires_grad=False)
+
+        d_size = self.n_frames - 1
+        c_size = self.n_frames - 2
+        a_size = self.n_dim * (self.n_frames - 2)
+        self.sigma_prior_d = nn.Parameter(torch.var(self.mu_post_d, correction=False, keepdim=True) + torch.mean(self.sigma_post[:d_size]))
+        self.sigma_prior_c = nn.Parameter(torch.var(self.mu_post_c, correction=False, keepdim=True) + torch.mean(self.sigma_post[d_size:d_size + c_size]))
+        self.sigma_prior_a = nn.Parameter(torch.var(self.mu_post_a, dim=1, correction=False) + torch.mean(self.sigma_post[d_size + c_size:d_size + c_size + a_size]))
+        self.sigma_prior_l = nn.Parameter(torch.tensor([1.0]), requires_grad=False)
+
+        # initialize optimizer
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
+
+        # initialize errors for storage
+        errors = torch.zeros(self.n_iterations)
+        kl_loss = torch.zeros(self.n_iterations)
+        ll_loss = torch.zeros(self.n_iterations)
+
+        # track free parameters
+        c_prior = torch.zeros(self.n_iterations)
+        d_prior = torch.zeros(self.n_iterations)
+        l_prior = torch.zeros(self.n_iterations)
+
+        c_post = torch.zeros(self.n_frames - 2, self.n_iterations)
+        d_post = torch.zeros(self.n_frames - 1, self.n_iterations)
+        l_post = torch.zeros(self.n_iterations)
+
+        # run optimization
+        for i in range(self.n_iterations):
+
+            # clear gradients
+            optimizer.zero_grad()
+
+            # compute ELBO
+            log_ll = self.compute_likelihood(self.n_corr_obs, self.n_total_obs, n_samples=self.n_samples)
+            kl = self.kl_divergence()
+            loss = self.compute_loss(log_ll, kl)
+
+            # gradient update
+            loss.backward()
+            optimizer.step()
+
+            # store errors
+            errors[i] = loss.item()
+            kl_loss[i] = kl.item()
+            ll_loss[i] = log_ll.item()
+
+            c_prior[i] = torch.rad2deg(self._transform(self.mu_prior_c, 'c').detach())
+            d_prior[i] = self._transform(self.mu_prior_d, 'd').detach()
+            l_prior[i] = self._transform(self.mu_prior_l, 'l').detach()
+
+            c_post[:, i] = torch.rad2deg(self._transform(self.mu_post_c, 'c').detach())
+            d_post[:, i] = self._transform(self.mu_post_d, 'd').detach()
+            l_post[i] = self._transform(self.mu_post_l, 'l').detach()
+
+            # print progress
+            if not i % 250:
+                print(f"Epoch: {i}, Loss: {loss.item()}")
+
+            # # early stopping
+            # if i > 0:
+            #     if (np.abs(errors[i] - errors[i-1])) < 1e-3:
+            #         errors = errors[:i]
+
+        x, p, _ = compute_hierarchical_ll(1, self.n_frames, self.n_dim, self.n_corr_obs, self.n_total_obs, self._transform(self.mu_post_d, 'd').unsqueeze(0), self.mu_post_c.unsqueeze(0), self.mu_post_a.unsqueeze(0), self._transform(self.mu_post_l, 'l'))
+        return x, p, errors, kl_loss, ll_loss, c_prior, d_prior, l_prior, c_post, d_post, l_post
 
     def _make_prior_posterior(self):
         """
@@ -128,7 +201,7 @@ class ELBO(nn.Module):
         # define means and covariances of the posterior
         mu_post = torch.cat((self._transform(self.mu_post_d, 'd'), self._transform(self.mu_post_c, 'c'), self.mu_post_a.flatten(), self._transform(self.mu_post_l, 'l')))
         _, L_post = make_positive_definite(self.sigma_post, self.eps)
-        posterior = D.MultivariateNormal(mu_post, scale_tril=L_post)
+        posterior = D.MultivariateNormal(mu_post.to(torch.float32), scale_tril=L_post)
         
         return prior, posterior
 
@@ -209,16 +282,10 @@ class ELBO(nn.Module):
         --------
         log_ll: Scalar torch tensor 
             Contains the log likelihood over the entire dataset
-        d: (n_samples x (n_frames - 1)) torch tensor
-            Average transformed distance
-        c: (n_samples x (n_frames - 2))
-            Average curvature
-        a: (n_samples x n_dim x n_frames)
-            Average acceleration (direction of curvature) 
-        p: (n_frames x n_frames) Torch tensor
-            Average estimated proportion correct
         x: (n_dim x n_frames) Torch tensor
             Average perceptual locations 
+        p: (n_frames x n_frames) Torch tensor
+            Average estimated proportion correct
         """
 
         _, posterior = self._make_prior_posterior()
@@ -243,22 +310,9 @@ class ELBO(nn.Module):
         l = self._transform(l, 'l')
         c = self._transform(c, 'c')
 
-        # construct trajectory
-        x, _, _, _, _ = compute_trajectory(n_samples, self.n_frames, self.n_dim, d, c, a)
+        _, _, log_ll = compute_hierarchical_ll(n_samples, self.n_frames, self.n_dim, n_corr_obs, n_total_obs, d, c, a, l)
 
-        # get perceptual distances
-        dist = torch.cdist(torch.transpose(x, 1, 2), torch.transpose(x, 1, 2))
-
-        # compute hierarchical model
-        normal = torch.distributions.Normal(torch.tensor([0.0]), torch.tensor([1.0])) # cdf of the standard normal
-        p_axb = normal.cdf(dist / np.sqrt(2)) * normal.cdf(dist / 2) + normal.cdf(-dist / np.sqrt(2)) * normal.cdf(-dist / 2)
-        p = (1 - 2 * l[:, None, None]) * p_axb.clone() + l[:, None, None]
-        
-        p_eps = 1e-8  # Small constant to prevent log(0)
-        p = torch.clamp(p, p_eps, 1 - p_eps)
-        log_ll = torch.sum((torch.tensor(n_corr_obs) * torch.log(p.clone())) + (torch.tensor(n_total_obs) - torch.tensor(n_corr_obs)) * torch.log(1 - p.clone()), dim=[1, 2])
-
-        return torch.mean(log_ll), torch.mean(d, dim=0), torch.mean(c, dim=0), torch.mean(a, dim=0), torch.mean(p, dim=0), torch.mean(x, dim=0)
+        return torch.mean(log_ll)
     
     def compute_loss(self, log_ll, kl_divergence):
         """
