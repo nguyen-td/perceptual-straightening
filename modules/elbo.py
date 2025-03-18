@@ -37,6 +37,8 @@ class ELBO(nn.Module):
         Number of trajectories to sample to compute the expected value (in ELBO)
     eps: Scalar (default: 1e-6)
         Regularization factor to ensure numerical stability for computing the Cholesky decomposition
+    verbose: Boolean
+        If True, outputs progress bar.
     """
     
     def __init__(self,  
@@ -47,7 +49,8 @@ class ELBO(nn.Module):
                  n_iterations=20000,
                  n_starts=10,
                  n_samples=100,
-                 eps=1e-6
+                 eps=1e-6,
+                 verbose=True
                 ):
         super(ELBO, self).__init__()
 
@@ -58,8 +61,8 @@ class ELBO(nn.Module):
         self.n_iterations = n_iterations
         self.n_samples = n_samples
         self.n_starts = n_starts
-        
         self.eps = eps
+        self.verbose = verbose
 
     def optimize_ELBO_SGD(self):
         """
@@ -91,7 +94,7 @@ class ELBO(nn.Module):
 
         # run MLE to initialize posterior distribution
         print('Running MLE to initialize posterior..........................')
-        _, _, _, c, d, a = optimize_ML(self.n_dim, self.n_corr_obs, self.n_total_obs, verbose=True, n_starts=self.n_starts)
+        _, _, _, c, d, a = optimize_ML(self.n_dim, self.n_corr_obs, self.n_total_obs, verbose=self.verbose, n_starts=self.n_starts)
 
         # create initial values
         self.n_frames = self.n_corr_obs.shape[0]
@@ -162,8 +165,9 @@ class ELBO(nn.Module):
             l_post[i] = self._transform(self.mu_post_l, 'l').detach()
 
             # print progress
-            if not i % 250:
-                print(f"Epoch: {i}, Loss: {loss.item()}")
+            if self.verbose:
+                if not i % 250:
+                    print(f"Epoch: {i}, Loss: {loss.item()}")
 
             # # early stopping
             # if i > 0:
