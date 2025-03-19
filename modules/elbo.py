@@ -255,10 +255,16 @@ class ELBO(nn.Module):
             # Interpolating between the different regions
             result = s1 * x * s2 + torch.pi * (1 - s2)
             return result
-    
+            # return x
+        
+        def inv_softplus(x):
+            return x + torch.log(-torch.expm1(-x))
+
         if var == 'd':
             f = nn.Softplus()
             y = f(x)
+        elif var == 'd_inv':
+            y = inv_softplus(x)
         elif var == 'l':
             f = torch.distributions.Normal(torch.tensor([0.0]), torch.tensor([1.0])) 
             y = 0.06 * f.cdf(x)

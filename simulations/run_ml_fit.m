@@ -5,7 +5,7 @@ close all
 clc
 
 addpath(genpath('/Users/nguyentiendung/GitHub/perceptual-straightening/'))
-load('sim_0090.mat')
+load('sim_0494.mat')
 
 %% Run fitting
 [x_fit, probCor, c] = ml_fit(S);
@@ -35,11 +35,11 @@ set(gca, 'FontName', 'Arial');
 set(gca, 'FontSize', 12);
 
 subplot(2, 3, 3)
-plot(rad2deg(c), rad2deg(S{1}.c), 'go')
+plot(rad2deg(S{1}.c), rad2deg(c), 'go')
 hold on;
 plot([0 180], [0 180], 'k--')
-xlabel('Estimated curvature')
-ylabel('Ground truth curvature')
+xlabel('Ground truth curvature')
+ylabel('Estimated curvature')
 
 subplot(2, 3, 4)
 s_fit = pca(x_fit);
@@ -63,10 +63,10 @@ set(gca, 'FontName', 'Arial');
 set(gca, 'FontSize', 12);
 
 subplot(2, 3, 6)
-plot(probCor(:), S{1}.Pc_reshaped(:), 'ro')
+plot(S{1}.Pc_reshaped(:), probCor(:), 'ro')
 hold on;
 plot([.5 1], [.5 1], 'k--')
-xlabel('Predicted performance')
-ylabel('Observed performance')
+xlabel('Observed performance')
+ylabel('Predicted performance')
 
 
