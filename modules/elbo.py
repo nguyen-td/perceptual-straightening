@@ -90,6 +90,8 @@ class ELBO(nn.Module):
             Updates of mu_post_d over iterations
         l_post: (n_iterations, ) Torch tensor
             Updates of mu_post_l over iterations
+        c_est: (n_samples x n_frames - 2) Torch tensor
+            Estimated curvature vector from generated trajectory; can be used to check if the estimated curvature is the same as the ground truth curvature used to generate the trajectory
         """
 
         # run MLE to initialize posterior distribution
@@ -174,8 +176,8 @@ class ELBO(nn.Module):
             #     if (np.abs(errors[i] - errors[i-1])) < 1e-3:
             #         errors = errors[:i]
 
-        x, p, _ = compute_hierarchical_ll(1, self.n_frames, self.n_dim, self.n_corr_obs, self.n_total_obs, self._transform(self.mu_post_d, 'd').unsqueeze(0), self.mu_post_c.unsqueeze(0), self.mu_post_a.unsqueeze(0), self._transform(self.mu_post_l, 'l'))
-        return x, p, errors, kl_loss, ll_loss, c_prior, d_prior, l_prior, c_post, d_post, l_post
+        x, p, _, c_est = compute_hierarchical_ll(1, self.n_frames, self.n_dim, self.n_corr_obs, self.n_total_obs, self._transform(self.mu_post_d, 'd').unsqueeze(0), self.mu_post_c.unsqueeze(0), self.mu_post_a.unsqueeze(0), self._transform(self.mu_post_l, 'l'))
+        return x, p, errors, kl_loss, ll_loss, c_prior, d_prior, l_prior, c_post, d_post, l_post, c_est
 
     def _make_prior_posterior(self):
         """
@@ -320,7 +322,7 @@ class ELBO(nn.Module):
         l = self._transform(l, 'l')
         c = self._transform(c, 'c')
 
-        _, _, log_ll = compute_hierarchical_ll(n_samples, self.n_frames, self.n_dim, n_corr_obs, n_total_obs, d, c, a, l)
+        _, _, log_ll, _ = compute_hierarchical_ll(n_samples, self.n_frames, self.n_dim, n_corr_obs, n_total_obs, d, c, a, l)
 
         return torch.mean(log_ll)
     
