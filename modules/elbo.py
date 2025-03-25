@@ -95,7 +95,8 @@ class ELBO(nn.Module):
         """
 
         # run MLE to initialize posterior distribution
-        print('Running MLE to initialize posterior..........................')
+        if self.verbose:
+            print('Running MLE to initialize posterior..........................')
         _, _, _, c, d, a = optimize_ML(self.n_dim, self.n_corr_obs, self.n_total_obs, verbose=self.verbose, n_starts=self.n_starts)
 
         # create initial values
