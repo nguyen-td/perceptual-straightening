@@ -8,7 +8,8 @@ clc;
 % addpath('/Users/nguyentiendung/GitHub/perceptual-straightening/simulations')
 addpath('/Users/tn22693/GitHub/perceptual-straightening/simulations')
 % save_data_path = '/Users/nguyentiendung/GitHub/perceptual-straightening/data';
-save_data_path = '/Users/tn22693/GitHub/perceptual-straightening/data';
+% save_data_path = '/Users/tn22693/GitHub/perceptual-straightening/data';
+save_data_path = '/Users/gorislab/Documents/GitHub/perceptual-straightening/data';
 
 %% Set trajectory generation settings
 

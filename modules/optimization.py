@@ -5,7 +5,7 @@ from scipy.spatial import distance
 from scipy.stats import norm
 from scipy.optimize import minimize
 import torch.distributions as D
-from pybads import BADS
+# from pybads import BADS
 
 from modules import compute_trajectory
 from utils import make_positive_definite
