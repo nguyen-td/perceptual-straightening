@@ -7,7 +7,7 @@ from scipy.spatial import distance
 from scipy.stats import norm
 
 from utils import make_positive_definite, make_positive_definite_batch, log_likelihood
-from modules import compute_trajectory, optimize_ML, compute_hierarchical_ll
+from modules import compute_trajectory, optimize_MLE, compute_hierarchical_ll
 
 class ELBO(nn.Module):
     """
@@ -97,7 +97,7 @@ class ELBO(nn.Module):
         # run MLE to initialize posterior distribution
         if self.verbose:
             print('Running MLE to initialize posterior..........................')
-        _, _, _, c, d, a = optimize_ML(self.n_dim, self.n_corr_obs, self.n_total_obs, verbose=self.verbose, n_starts=self.n_starts)
+        _, _, _, c, d, a, inv_hess = optimize_MLE(self.n_dim, self.n_corr_obs, self.n_total_obs, verbose=self.verbose, n_starts=self.n_starts)
 
         # create initial values
         self.n_frames = self.n_corr_obs.shape[0]
@@ -106,8 +106,6 @@ class ELBO(nn.Module):
         self.mu_post_c = nn.Parameter(c.squeeze())
         self.mu_post_a = nn.Parameter(a.squeeze())
         self.mu_post_l = nn.Parameter(self._transform(torch.tensor([0.0]), 'l'))
-        self.mu_post_inits = torch.hstack((self.mu_post_d, self.mu_post_c, self.mu_post_a.flatten(), self.mu_post_l))
-        self.sigma_post = nn.Parameter(torch.eye(len(self.mu_post_inits)))
 
         self.mu_prior_d = nn.Parameter(self._transform(torch.tensor([1.0]), 'd'))
         self.mu_prior_c = nn.Parameter(torch.deg2rad(torch.tensor(60)))
@@ -117,8 +115,15 @@ class ELBO(nn.Module):
         d_size = self.n_frames - 1
         c_size = self.n_frames - 2
         a_size = self.n_dim * (self.n_frames - 2)
+
+        A = torch.hstack((self.mu_post_d, self.mu_post_c, self.mu_post_a.flatten(), self.mu_post_l))
+        sigma_post = torch.zeros(len(A), len(A))
+        sigma_post[:len(A)-1, :len(A)-1] = torch.tensor(inv_hess)
+        sigma_post[-1, -1] = 1.0 # variance for l
+        self.sigma_post = nn.Parameter(sigma_post)
+
         self.sigma_prior_d = nn.Parameter(torch.var(self.mu_post_d, correction=False, keepdim=True) + torch.mean(self.sigma_post[:d_size]))
-        self.sigma_prior_c = nn.Parameter(torch.var(self.mu_post_c, correction=False, keepdim=True) + torch.mean(self.sigma_post[d_size:d_size + c_size]))
+        self.sigma_prior_c = nn.Parameter(torch.var(self.mu_post_c, correction=False, keepdim=True) + torch.mean(self.sigma_post[d_size:d_size + c_size]), )
         self.sigma_prior_a = nn.Parameter(torch.var(self.mu_post_a, dim=1, correction=False) + torch.mean(self.sigma_post[d_size + c_size:d_size + c_size + a_size]))
         self.sigma_prior_l = nn.Parameter(torch.tensor([1.0]), requires_grad=False)
 
@@ -172,10 +177,21 @@ class ELBO(nn.Module):
                 if not i % 250:
                     print(f"Epoch: {i}, Loss: {loss.item()}")
 
-            # # early stopping
-            # if i > 0:
-            #     if (np.abs(errors[i] - errors[i-1])) < 1e-3:
-            #         errors = errors[:i]
+            # early stopping based on convergence of prior
+            if (i > 0) and (i % 5 == 0):
+                if (np.abs(c_prior[i] - c_prior[i-5])) < 1e-5 and (np.abs(kl_loss[i] - kl_loss[i-5]) < 1e-4):
+                    errors = errors[:i]
+                    kl_loss = kl_loss[:i]
+                    ll_loss = ll_loss[:i]
+
+                    c_prior = c_prior[:i]
+                    d_prior = d_prior[:i]
+                    l_prior = l_prior[:i]
+
+                    c_post = c_post[:, :i]
+                    d_post = d_post[:, :i]
+                    l_post = l_post[:i]
+                    break
 
         x, p, _, c_est = compute_hierarchical_ll(1, self.n_frames, self.n_dim, self.n_corr_obs, self.n_total_obs, self._transform(self.mu_post_d, 'd').unsqueeze(0), self.mu_post_c.unsqueeze(0), self.mu_post_a.unsqueeze(0), self._transform(self.mu_post_l, 'l'))
         return x, p, errors, kl_loss, ll_loss, c_prior, d_prior, l_prior, c_post, d_post, l_post, c_est

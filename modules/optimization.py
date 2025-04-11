@@ -10,7 +10,7 @@ import torch.distributions as D
 from modules import compute_trajectory
 from utils import make_positive_definite
 
-def optimize_ML(n_dim, n_corr_obs, n_total_obs, lr=1e-4, n_iter=1000, verbose=True, n_starts=10):
+def optimize_MLE(n_dim, n_corr_obs, n_total_obs, lr=1e-4, n_iter=1000, verbose=True, n_starts=10):
     """
     Run maximum likelihood estimation (MLE) to estimate perceptual trajectories from perceptual observations. Uses polar coordinates.
 
@@ -47,11 +47,16 @@ def optimize_ML(n_dim, n_corr_obs, n_total_obs, lr=1e-4, n_iter=1000, verbose=Tr
         Distance vector
     a: (n_dim x n_frames - 2) Torch tensor
         Orthonormal acceleration vectors
+    inv_hess: (n_params x n_params) Numpy array
+        Inverse of the Hessian matrix evaluated at MLE, corresponds to Fisher Information Matrix because NLL is minimized
     """
 
     n_frames = n_corr_obs.shape[0]
 
     def func_NLL(vec):
+        '''
+        Returns negative log likelihood. 
+        '''
         # get perceptual locations
         c_ = torch.tensor(vec[:n_frames - 2]).unsqueeze(0)
         d_ = torch.tensor(vec[n_frames-2:n_frames-2 + n_frames-1]).unsqueeze(0)
@@ -69,6 +74,8 @@ def optimize_ML(n_dim, n_corr_obs, n_total_obs, lr=1e-4, n_iter=1000, verbose=Tr
 
     # run optimization using a multistart procedure
     old_loss = np.array([10e10])
+    n_free_params = (n_frames - 2) + (n_frames - 1) + n_dim * (n_frames - 2)
+    inv_hess = np.zeros((n_free_params, n_free_params))
 
     for i in range(n_starts):
 
@@ -129,6 +136,7 @@ def optimize_ML(n_dim, n_corr_obs, n_total_obs, lr=1e-4, n_iter=1000, verbose=Tr
                 normal = torch.distributions.Normal(torch.tensor([0.0]), torch.tensor([1.0])) # cdf of the standard normal
                 p_axb = normal.cdf(dist / np.sqrt(2)) * normal.cdf(dist / 2) + normal.cdf(-dist / np.sqrt(2)) * normal.cdf(-dist / 2)
                 p = (1 - 2 * l) * p_axb.clone() + l
+                inv_hess = res.hess_inv.todense()
 
                 old_loss = new_loss
                 
@@ -138,7 +146,7 @@ def optimize_ML(n_dim, n_corr_obs, n_total_obs, lr=1e-4, n_iter=1000, verbose=Tr
             print(f"Iteration {i+1} | Loss: {res.fun}")
             # print(f"Iteration {i+1} | Loss: {res['fval']}")
 
-    return x, c_est, p, c, d, a
+    return x, c_est, p, c, d, a, inv_hess
 
 def optimize_ELBO(n_dim, n_corr_obs, n_total_obs, n_samples=100, lr=1e-4, eps=1e-6, n_iter=1000, verbose=True, n_starts=10):
     """
