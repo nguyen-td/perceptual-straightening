@@ -102,10 +102,13 @@ class ELBO(nn.Module):
         # create initial values
         self.n_frames = self.n_corr_obs.shape[0]
 
-        self.mu_post_d = nn.Parameter(self._transform(d.squeeze(), 'd'))
+        self.mu_post_d = nn.Parameter(self._transform(d.squeeze(), 'd'), requires_grad=False)
         self.mu_post_c = nn.Parameter(c.squeeze())
         self.mu_post_a = nn.Parameter(a.squeeze())
         self.mu_post_l = nn.Parameter(self._transform(torch.tensor([0.0]), 'l'))
+
+        self.mu_post_inits = torch.hstack((self.mu_post_d, self.mu_post_c, self.mu_post_a.flatten(), self.mu_post_l))
+        self.sigma_post = nn.Parameter(torch.eye(len(self.mu_post_inits)))
 
         self.mu_prior_d = nn.Parameter(self._transform(torch.tensor([1.0]), 'd'))
         self.mu_prior_c = nn.Parameter(torch.deg2rad(torch.tensor(60)))
@@ -116,15 +119,18 @@ class ELBO(nn.Module):
         c_size = self.n_frames - 2
         a_size = self.n_dim * (self.n_frames - 2)
 
-        A = torch.hstack((self.mu_post_d, self.mu_post_c, self.mu_post_a.flatten(), self.mu_post_l))
-        sigma_post = torch.zeros(len(A), len(A))
-        sigma_post[:len(A)-1, :len(A)-1] = torch.tensor(inv_hess)
-        sigma_post[-1, -1] = 1.0 # variance for l
-        self.sigma_post = nn.Parameter(sigma_post)
+        # A = torch.hstack((self.mu_post_d, self.mu_post_c, self.mu_post_a.flatten(), self.mu_post_l))
+        # sigma_post = torch.zeros(len(A), len(A))
+        # sigma_post[:len(A)-1, :len(A)-1] = torch.tensor(inv_hess)
+        # sigma_post[-1, -1] = 1.0 # variance for l
+        # self.sigma_post = nn.Parameter(sigma_post)
 
-        self.sigma_prior_d = nn.Parameter(torch.var(self.mu_post_d, correction=False, keepdim=True) + torch.mean(self.sigma_post[:d_size]))
-        self.sigma_prior_c = nn.Parameter(torch.var(self.mu_post_c, correction=False, keepdim=True) + torch.mean(self.sigma_post[d_size:d_size + c_size]), )
-        self.sigma_prior_a = nn.Parameter(torch.var(self.mu_post_a, dim=1, correction=False) + torch.mean(self.sigma_post[d_size + c_size:d_size + c_size + a_size]))
+        self.sigma_prior_d = nn.Parameter(torch.var(self.mu_post_d, correction=True, keepdim=True) + torch.mean(self.sigma_post[:d_size]))
+        self.sigma_prior_c = nn.Parameter(torch.var(self.mu_post_c, correction=True, keepdim=True) + torch.mean(self.sigma_post[d_size:d_size + c_size]))
+        self.sigma_prior_a = nn.Parameter(torch.var(self.mu_post_a, dim=1, correction=True) + torch.mean(self.sigma_post[d_size + c_size:d_size + c_size + a_size]))
+        # self.sigma_prior_d = nn.Parameter(torch.tensor([0.001]))
+        # self.sigma_prior_c = nn.Parameter(torch.tensor([0.5]))
+        # self.sigma_prior_a = nn.Parameter(torch.tensor([5.0]).repeat(self.n_dim))
         self.sigma_prior_l = nn.Parameter(torch.tensor([1.0]), requires_grad=False)
 
         # initialize optimizer
