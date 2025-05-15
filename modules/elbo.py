@@ -6,8 +6,8 @@ import torch.distributions as D
 from scipy.spatial import distance
 from scipy.stats import norm
 
-from utils import make_positive_definite, make_positive_definite_batch, log_likelihood
-from modules import compute_trajectory, optimize_MLE, compute_hierarchical_ll
+from utils import make_positive_definite
+from modules import optimize_MLE, compute_hierarchical_ll
 
 class ELBO(nn.Module):
     """

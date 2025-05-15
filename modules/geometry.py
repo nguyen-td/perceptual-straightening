@@ -29,7 +29,7 @@ def orthogonalize_acc(a, v_hat):
 
     return a_hat_orth
 
-def compute_trajectory(n_samples, n_frames, n_dim, d, c, a_init):
+def compute_trajectory_perceptual(n_samples, n_frames, n_dim, d, c, a_init):
     """
     Compute perceptual trajectory from polar coordinates.
 
@@ -87,6 +87,36 @@ def compute_trajectory(n_samples, n_frames, n_dim, d, c, a_init):
 
     return x, v, c_est, v_hat, a_hat_orth
 
+def compute_curvature_pixel(I):
+    """
+    Compute pixel-domain curvature.
+
+    Input:
+    ------
+    I: (n_pixels x n_pixels x n_frames) Numpy array
+        Input video
+
+    Output:
+    -------
+    c: (n_frames - 2) Numpy array
+        Vector of curvatures (deg)
+    """
+    n_frames = I.shape[2]
+
+    # compute local trajectory
+    v = np.diff(I)
+    v_hat = np.zeros((v.shape[0] * v.shape[1], v.shape[2]))
+
+    for iframe in range(v.shape[2]):
+        v_t = v[:, :, iframe]
+        v_hat[:, iframe] = v_t.flatten() / np.linalg.norm(v_t.flatten())
+
+    c = np.zeros((n_frames - 2))
+    for iframe in range(1, n_frames - 1):
+        c[iframe-1] = np.arccos(np.dot(v_hat[:, iframe - 1], v_hat[:, iframe]))
+
+    return c
+
 def compute_hierarchical_ll(n_samples, n_frames, n_dim, n_corr_obs, n_total_obs, d, c, a, l):
     """
     Compute the likelihood function from the hierarchical model.
@@ -125,7 +155,7 @@ def compute_hierarchical_ll(n_samples, n_frames, n_dim, n_corr_obs, n_total_obs,
     """
 
     # construct trajectory
-    x, _, c_est, _, _ = compute_trajectory(n_samples, n_frames, n_dim, d, c, a)
+    x, _, c_est, _, _ = compute_trajectory_perceptual(n_samples, n_frames, n_dim, d, c, a)
 
     # get perceptual distances
     dist = torch.cdist(torch.transpose(x, 1, 2), torch.transpose(x, 1, 2))

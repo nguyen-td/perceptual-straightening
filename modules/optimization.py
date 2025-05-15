@@ -7,7 +7,7 @@ from scipy.optimize import minimize
 import torch.distributions as D
 # from pybads import BADS
 
-from modules import compute_trajectory
+from modules import compute_trajectory_perceptual
 from utils import make_positive_definite
 
 def optimize_MLE(n_dim, n_corr_obs, n_total_obs, lr=1e-4, n_iter=1000, verbose=True, n_starts=10):
@@ -61,7 +61,7 @@ def optimize_MLE(n_dim, n_corr_obs, n_total_obs, lr=1e-4, n_iter=1000, verbose=T
         c_ = torch.tensor(vec[:n_frames - 2]).unsqueeze(0)
         d_ = torch.tensor(vec[n_frames-2:n_frames-2 + n_frames-1]).unsqueeze(0)
         a_ = torch.tensor(start_vec[n_frames-2 + n_frames-1:].reshape(n_dim, n_frames - 2)).unsqueeze(0)
-        x, _, _, _, _ = compute_trajectory(1, n_frames, n_dim, d_, c_, a_)
+        x, _, _, _, _ = compute_trajectory_perceptual(1, n_frames, n_dim, d_, c_, a_)
 
         # get perceptual distances
         dist = torch.cdist(torch.transpose(x, 1, 2), torch.transpose(x, 1, 2))
@@ -117,7 +117,7 @@ def optimize_MLE(n_dim, n_corr_obs, n_total_obs, lr=1e-4, n_iter=1000, verbose=T
                 c = torch.tensor(res.x[:n_frames - 2]).unsqueeze(0)
                 d = torch.tensor(res.x[n_frames-2:n_frames-2 + n_frames-1]).unsqueeze(0)
                 a = torch.tensor(res.x[n_frames-2 + n_frames-1:].reshape(n_dim, n_frames - 2)).unsqueeze(0)
-                x, _, c_est, _, _ = compute_trajectory(1, n_frames, n_dim, d, c, a)
+                x, _, c_est, _, _ = compute_trajectory_perceptual(1, n_frames, n_dim, d, c, a)
 
                 # get perceptual distances
                 dist = torch.cdist(torch.transpose(x, 1, 2), torch.transpose(x, 1, 2))
