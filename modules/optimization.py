@@ -233,7 +233,7 @@ def optimize_null(stim_folder, n_corr_obs, n_total_obs, n_dim, n_starts=10, n_it
             # binomial = torch.distributions.Binomial(torch.tensor(n_corr_obs), probs=p)
             # prob_est = binomial.log_prob(torch.tensor(n_corr_obs)).exp()
 
-            return torch.mean((torch.tensor(prob_corr) - p.squeeze())**2)
+            return (torch.tensor(prob_corr) - p.squeeze())**2 # this does not account for the frame-by-frame discriminability.. component-wise least-squares?
     
         n_frames = I.shape[-1]
 
