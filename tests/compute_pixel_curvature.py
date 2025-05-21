@@ -9,18 +9,18 @@ import matplotlib.pyplot as plt
 
 
 # load video
-subject = 'ryan'
-category = 'natural'
-eccentricity = 'fovea'
-movie_id = 5
+subject = 'yb'
+category = 'synthetic'
+eccentricity = 'parafovea'
+movie_id = 4
 diameter = 6; # 6, 24, 36
-movie_name = 'prairie1'
+movie_name = 'egomotion'
 
 # read in natural image frames
 v_folder = os.path.join('data', 'yoon_stimulus', f'diameter_{diameter:02d}_deg', f'movie{movie_id:02d}-{movie_name}')
 im = []
 for fname in sorted(os.listdir(v_folder)):
-    if 'natural' in fname:
+    if category in fname:
         im_path = os.path.join(v_folder, fname)
         im.append(imageio.imread(im_path))
 

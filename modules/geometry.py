@@ -112,8 +112,8 @@ def compute_curvature_pixel(I):
         v_hat[:, iframe] = v_t.flatten() / np.linalg.norm(v_t.flatten())
 
     c = np.zeros((n_frames - 2))
-    for iframe in range(1, n_frames - 1):
-        c[iframe-1] = np.arccos(np.dot(v_hat[:, iframe - 1], v_hat[:, iframe]))
+    for iframe in range(n_frames - 2):
+        c[iframe] = np.arccos(np.dot(v_hat[:, iframe], v_hat[:, iframe+1]))
 
     return c
 

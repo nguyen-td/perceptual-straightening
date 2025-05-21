@@ -8,19 +8,19 @@ clc
 addpath(genpath('/Users/tn22693/GitHub/perceptual-straightening/'))
 
 %% Load video
-subject = 'ryan';
-category = 'natural';
-eccentricity = 'fovea';
-movie_id = 5;
+subject = 'yb';
+category = 'synthetic';
+eccentricity = 'parafovea';
+movie_id = 4;
 diameter = 6; % 6, 24, 36
-movie_name = 'prairie1';
+movie_name = 'egomotion';
 
 v_folder = fullfile('data', 'yoon_stimulus', ['diameter_' num2str(diameter,'%02.f') '_deg'], ['movie' num2str(movie_id,'%02.f') '-' movie_name]);
 files = dir(v_folder);
 
 iframe = 1;
 for ifile = 1:length(files)
-    if contains(files(ifile).name, 'natural')
+    if contains(files(ifile).name, category)
        im{iframe} = imread(fullfile(v_folder, files(ifile).name)); 
        iframe = iframe + 1;
     end
@@ -28,7 +28,6 @@ end
 
 I = double(cat(3, im{:})) / 255;
 
-figure(1)
 for iframe = 1:size(I, 3)
     imshow(I(:, :, iframe)); colormap('gray'), hold on, axis off, axis square 
     set(gca, 'YDir','normal')
@@ -48,8 +47,8 @@ for iframe = 1:size(v, 3)
 end
 
 c = zeros(n_frames - 2, 1);
-for iframe = 2:n_frames - 1
-    c(iframe-1) = acos(dot(v_hat(:, iframe-1), v_hat(:, iframe)));
+for iframe = 1:n_frames - 2
+    c(iframe) = acos(dot(v_hat(:, iframe), v_hat(:, iframe+1)));
 end
 
 disp(rad2deg(mean(c)))
