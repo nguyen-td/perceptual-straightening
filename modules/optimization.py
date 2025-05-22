@@ -6,6 +6,7 @@ from scipy.stats import norm
 from scipy.optimize import minimize
 import torch.distributions as D
 import imageio.v2 as imageio 
+from pathlib import Path
 import os
 
 from modules import compute_trajectory_perceptual, compute_curvature_pixel
@@ -173,7 +174,7 @@ def optimize_MLE(n_dim, n_corr_obs, n_total_obs, n_iter=1000, verbose=True, n_st
     else:
         return x, c_est, p
 
-def optimize_null(stim_folder, n_corr_obs, n_total_obs, n_dim, n_starts=10, n_iter=1000, is_natural=True, version=1, disp=False):
+def optimize_null(stim_folder, n_corr_obs, n_total_obs, n_dim, n_starts=10, n_iter=1000, n_frames=11, is_natural=True, version=1, disp=False):
     """
     Compute null model where discriminabilities (i.e. perceptual distances) are the identical to those of the human observer and where curvatures are matched to pixel-domain curvatures. 
     
@@ -191,6 +192,8 @@ def optimize_null(stim_folder, n_corr_obs, n_total_obs, n_dim, n_starts=10, n_it
         Number of multistarts. Default is 10.
     n_iter: Scalar
         Number of iterations. Default is 1000.
+    n_frames: Scalar
+        Number of frames. Default is 11.
     is_natural: Boolean
         Whether the stimulus is natural (True) or synthetic (False). Default is True.
     version: 1 or 2
@@ -204,9 +207,12 @@ def optimize_null(stim_folder, n_corr_obs, n_total_obs, n_dim, n_starts=10, n_it
     # load videos 
     im = []
     for fname in sorted(os.listdir(stim_folder)):
+        if not is_natural and (fname == f'natural01.png'): # first and last frames for synthetic videos are the same as for natural videos
+            im.append(imageio.imread(Path(stim_folder) / fname))
         if im_category in fname:
             im_path = os.path.join(stim_folder, fname)
             im.append(imageio.imread(im_path))
+    im.append(imageio.imread(Path(stim_folder) / f'natural{n_frames:02d}.png'))
 
     # convert to 3D array and normalize to [0, 1]
     I = np.stack(im, axis=-1).astype(np.float64) / 255
