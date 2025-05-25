@@ -102,7 +102,7 @@ class ELBO(nn.Module):
         # create initial values
         self.n_frames = self.n_corr_obs.shape[0]
 
-        self.mu_post_d = nn.Parameter(self._transform(d.squeeze(), 'd'), requires_grad=False)
+        self.mu_post_d = nn.Parameter(self._transform(d.squeeze(), 'd'))
         self.mu_post_c = nn.Parameter(c.squeeze())
         self.mu_post_a = nn.Parameter(a.squeeze())
         self.mu_post_l = nn.Parameter(self._transform(torch.tensor([0.0]), 'l'))

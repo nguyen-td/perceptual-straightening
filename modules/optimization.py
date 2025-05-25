@@ -212,7 +212,8 @@ def optimize_null(stim_folder, n_corr_obs, n_total_obs, n_dim, n_starts=10, n_it
         if im_category in fname:
             im_path = os.path.join(stim_folder, fname)
             im.append(imageio.imread(im_path))
-    im.append(imageio.imread(Path(stim_folder) / f'natural{n_frames:02d}.png'))
+    if not is_natural:
+        im.append(imageio.imread(Path(stim_folder) / f'natural{n_frames:02d}.png')) # last frame
 
     # convert to 3D array and normalize to [0, 1]
     I = np.stack(im, axis=-1).astype(np.float64) / 255
@@ -253,8 +254,8 @@ def optimize_null(stim_folder, n_corr_obs, n_total_obs, n_dim, n_starts=10, n_it
         UB = np.zeros(np.size(start_vec))
 
         # bounds for d
-        LB[:n_frames-1] = 0
-        UB[:n_frames-1] = 3
+        LB[:n_frames-1] = -100
+        UB[:n_frames-1] = 100
 
         # bounds for a
         LB[n_frames-1:] = -100
