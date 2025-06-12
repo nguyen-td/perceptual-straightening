@@ -185,7 +185,7 @@ class ELBO(nn.Module):
 
             # early stopping based on convergence of prior
             if (i > 0) and (i % 5 == 0):
-                if (np.abs(c_prior[i] - c_prior[i-5])) < 1e-5 and (np.abs(kl_loss[i] - kl_loss[i-5]) < 1e-4):
+                if ((np.abs(c_prior[i] - c_prior[i-5])) < 1e-5) and ((np.abs(kl_loss[i] - kl_loss[i-5])) < 1e-4):
                     errors = errors[:i]
                     kl_loss = kl_loss[:i]
                     ll_loss = ll_loss[:i]
@@ -282,14 +282,15 @@ class ELBO(nn.Module):
             return result
             # return x
         
-        def inv_softplus(x):
-            return x + torch.log(-torch.expm1(-x))
+        # def inv_softplus(x):
+        #     return x + torch.log(-torch.expm1(-x))
 
         if var == 'd':
-            f = nn.Softplus()
+            f = nn.Softplus(beta=100) # closely approximate ReLu
+            # f = nn.ReLU()
             y = f(x)
-        elif var == 'd_inv':
-            y = inv_softplus(x)
+        # elif var == 'd_inv':
+        #     y = inv_softplus(x)
         elif var == 'l':
             f = torch.distributions.Normal(torch.tensor([0.0]), torch.tensor([1.0])) 
             y = 0.06 * f.cdf(x)
