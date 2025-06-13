@@ -185,7 +185,7 @@ class ELBO(nn.Module):
 
             # early stopping based on convergence of prior
             if (i > 0) and (i % 5 == 0):
-                if ((np.abs(c_prior[i] - c_prior[i-5])) < 1e-5) and ((np.abs(kl_loss[i] - kl_loss[i-5])) < 1e-4):
+                if (np.abs(c_prior[i] - c_prior[i-3]) < 1e-5) and (np.abs(kl_loss[i] - kl_loss[i-3]) < 1e-4):
                     errors = errors[:i]
                     kl_loss = kl_loss[:i]
                     ll_loss = ll_loss[:i]
