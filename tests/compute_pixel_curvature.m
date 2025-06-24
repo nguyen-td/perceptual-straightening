@@ -8,12 +8,12 @@ clc
 addpath(genpath('/Users/tn22693/GitHub/perceptual-straightening/'))
 
 %% Load video
-subject = 'yb';
+subject = 'alexandra';
 category = 'synthetic';
 eccentricity = 'parafovea';
-movie_id = 4;
+movie_id = 6;
 diameter = 6; % 6, 24, 36
-movie_name = 'egomotion';
+movie_name = 'carnegie-dam';
 
 v_folder = fullfile('data', 'yoon_stimulus', ['diameter_' num2str(diameter,'%02.f') '_deg'], ['movie' num2str(movie_id,'%02.f') '-' movie_name]);
 files = dir(v_folder);
@@ -34,7 +34,7 @@ for iframe = 1:size(I, 3)
     pause(.1)
 end
 
-%% Compute pixel trajectory
+%% Compute pixel curvature
 n_frames = size(I, 3);
     
 % compute local trajectory

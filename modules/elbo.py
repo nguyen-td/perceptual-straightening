@@ -286,7 +286,7 @@ class ELBO(nn.Module):
         #     return x + torch.log(-torch.expm1(-x))
 
         if var == 'd':
-            f = nn.Softplus(beta=100) # closely approximate ReLu
+            f = nn.Softplus(beta=1000) # closely approximate ReLu
             # f = nn.ReLU()
             y = f(x)
         # elif var == 'd_inv':
