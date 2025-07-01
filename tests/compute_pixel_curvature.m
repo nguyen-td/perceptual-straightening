@@ -8,14 +8,15 @@ clc
 addpath(genpath('/Users/tn22693/GitHub/perceptual-straightening/'))
 
 %% Load video
-subject = 'alexandra';
-category = 'synthetic';
-eccentricity = 'parafovea';
+subject = 'ryan';
+category = 'natural';
+eccentricity = 'periphery';
 movie_id = 6;
-diameter = 6; % 6, 24, 36
+diameter = 24; % 6, 24, 36
 movie_name = 'carnegie-dam';
 
-v_folder = fullfile('data', 'yoon_stimulus', ['diameter_' num2str(diameter,'%02.f') '_deg'], ['movie' num2str(movie_id,'%02.f') '-' movie_name]);
+v_folder = fullfile('data', 'yoon_stimulus_revised', ['diameter_' num2str(diameter,'%02.f') '_deg'], ['movie' num2str(movie_id,'%02.f') '-' movie_name]);
+% v_folder = fullfile('data', 'yoon_stimulus_orig', ['movie' num2str(movie_id,'%02.f') '-' movie_name]);
 files = dir(v_folder);
 
 iframe = 1;
