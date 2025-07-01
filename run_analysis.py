@@ -10,11 +10,11 @@ from modules import optimize_null, forward_simulation
 # data settings
 subject = 'ryan'
 category = 'natural'
-eccentricity = 'periphery'
-movie_id = 6
-diameter = 24; # 6, 24, 36
-dat_movie_name = 'DAM'   # movie name as in the data file name
-stim_movie_name = 'carnegie-dam' # movie name as in the stimulus file name
+eccentricity = 'fovea'
+movie_id = 5
+diameter = 6; # 6, 24, 36
+dat_movie_name = 'PRAIRIE'   # movie name as in the data file name
+stim_movie_name = 'prairie1' # movie name as in the stimulus file name
 
 # file where data will be stored
 save_path = Path('data') / 'yoon_results'
