@@ -53,10 +53,11 @@ for itrial in range(n_trials):
     n_corr_obs[a_frame-1, b_frame-1] += 1 if true_frame == pred_frame else 0
 
 # create bootstraps
-# curvatures = np.zeros((n_bootstraps, 2)) # 1st column: c_null, 2nd colum: c_est; both columns are independent of each other and the order within columns does not matter
-curvatures = genfromtxt(f_name, delimiter=',')
+curvatures = np.zeros((n_bootstraps, 2)) # 1st column: c_null, 2nd colum: c_est; both columns are independent of each other and the order within columns does not matter
+# curvatures = genfromtxt(f_name, delimiter=',')
 
-for iboot in range(37, n_bootstraps):
+# for iboot in range(37, n_bootstraps):
+for iboot in range(n_bootstraps):
     t = time.perf_counter()
 
     print(f'Bootstrap: {iboot} \n')
