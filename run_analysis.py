@@ -3,18 +3,23 @@ import numpy as np
 from pathlib import Path
 import os
 import time
+from numpy import genfromtxt
 
 from modules.elbo import ELBO
 from modules import optimize_null, forward_simulation
 
+# # set device (CPU or GPU)
+# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+# print(f'Device (CPU or GPU): ', device)
+
 # data settings
-subject = 'ryan'
-category = 'natural'
-eccentricity = 'fovea'
-movie_id = 5
-diameter = 6; # 6, 24, 36
-dat_movie_name = 'PRAIRIE'   # movie name as in the data file name
-stim_movie_name = 'prairie1' # movie name as in the stimulus file name
+subject = 'yb'
+category = 'synthetic'
+eccentricity = 'periphery'
+movie_id = 6
+diameter = 36; # 6, 24, 36
+dat_movie_name = 'DAM'   # movie name as in the data file name
+stim_movie_name = 'carnegie-dam' # movie name as in the stimulus file name
 
 # file where data will be stored
 save_path = Path('data') / 'yoon_results'
@@ -48,9 +53,10 @@ for itrial in range(n_trials):
     n_corr_obs[a_frame-1, b_frame-1] += 1 if true_frame == pred_frame else 0
 
 # create bootstraps
-curvatures = np.zeros((n_bootstraps, 2)) # 1st column: c_null, 2nd colum: c_est; both columns are independent of each other and the order within columns does not matter
+# curvatures = np.zeros((n_bootstraps, 2)) # 1st column: c_null, 2nd colum: c_est; both columns are independent of each other and the order within columns does not matter
+curvatures = genfromtxt(f_name, delimiter=',')
 
-for iboot in range(n_bootstraps):
+for iboot in range(37, n_bootstraps):
     t = time.perf_counter()
 
     print(f'Bootstrap: {iboot} \n')
@@ -67,13 +73,13 @@ for iboot in range(n_bootstraps):
 
     print('\nEstimate curvature from null model observer data: ...')
     n_corr_obs_null = np.round(n_total_obs_null_sim * prob_corr_null_sim)
-    elbo_null = ELBO(n_dim, n_corr_obs_null, n_total_obs_null_sim, n_starts=n_starts, n_iterations=n_iterations)
+    elbo_null = ELBO(n_dim, n_corr_obs_null, n_total_obs_null_sim, n_starts=n_starts, n_iterations=n_iterations, verbose=False)
     _, _, _, _, _, _, _, _, _, _, _, c_est_null = elbo_null.optimize_ELBO_SGD()
     curvatures[iboot, 0] = torch.rad2deg(torch.mean(c_est_null)).detach().numpy()
 
     # run estimation on real data
     print('\nEstimate curvature from human observer data: ...')
-    elbo = ELBO(n_dim, n_corr_obs, n_total_obs, n_starts=n_starts, n_iterations=n_iterations)
+    elbo = ELBO(n_dim, n_corr_obs, n_total_obs, n_starts=n_starts, n_iterations=n_iterations, verbose=False)
     _, _, _, _, _, _, _, _, _, _, _, c_est = elbo.optimize_ELBO_SGD()
     curvatures[iboot, 1] = torch.rad2deg(torch.mean(c_est)).detach().numpy()
 
