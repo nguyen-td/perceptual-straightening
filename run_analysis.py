@@ -13,13 +13,13 @@ from modules import optimize_null, forward_simulation
 # print(f'Device (CPU or GPU): ', device)
 
 # data settings
-subject = 'yb'
-category = 'synthetic'
-eccentricity = 'periphery'
-movie_id = 6
-diameter = 36; # 6, 24, 36
-dat_movie_name = 'DAM'   # movie name as in the data file name
-stim_movie_name = 'carnegie-dam' # movie name as in the stimulus file name
+subject = 'qj'
+category = 'natural'
+eccentricity = 'fovea'
+movie_id = 4
+diameter = 6; # 6, 24, 36
+dat_movie_name = 'EGOMOTION'   # movie name as in the data file name
+stim_movie_name = 'egomotion' # movie name as in the stimulus file name
 
 # file where data will be stored
 save_path = Path('data') / 'yoon_results'

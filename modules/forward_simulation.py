@@ -37,8 +37,8 @@ def forward_simulation(x, n_reps, var=0.1, abort_prob=0.1):
     for i_pair in range(n_pair_combs):
         for i_reps in range(n_reps):
             if np.random.rand() > abort_prob:
-                sim_A = np.random.multivariate_normal(x[:, all_pairs[i_pair, 0]], sigma) # frame A
-                sim_B = np.random.multivariate_normal(x[:, all_pairs[i_pair, 1]], sigma) # frame B
+                sim_A = np.random.multivariate_normal(x[:, all_pairs[i_pair, 0]], sigma) # frame A TODO: try sim_A = x[]
+                sim_B = np.random.multivariate_normal(x[:, all_pairs[i_pair, 1]], sigma) # frame B TODO: try sim_B = x[]
                 if i_reps % 2 == 0:
                     sim_X = np.random.multivariate_normal(x[:, all_pairs[i_pair, 0]], sigma) # X = A
                     dist_AX = np.linalg.norm(sim_A - sim_X)
