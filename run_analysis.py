@@ -14,7 +14,7 @@ from modules import optimize_null, forward_simulation
 
 # data settings
 subject = 'ryan'
-category = 'synthetic'
+category = 'natural'
 eccentricity = 'periphery'
 movie_id = 5
 diameter = 36; # 6, 24, 36
