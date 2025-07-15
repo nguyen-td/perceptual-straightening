@@ -13,7 +13,7 @@ from modules import optimize_null, forward_simulation
 # print(f'Device (CPU or GPU): ', device)
 
 # data settings
-subject = 'ryan'
+subject = 'qj'
 category = 'synthetic'
 eccentricity = 'periphery'
 movie_id = 5
@@ -53,12 +53,12 @@ for itrial in range(n_trials):
     n_corr_obs[a_frame-1, b_frame-1] += 1 if true_frame == pred_frame else 0
 
 # create bootstraps
-# curvatures = np.zeros((n_bootstraps, 2)) # 1st column: c_null, 2nd colum: c_est; both columns are independent of each other and the order within columns does not matter
-curvatures = genfromtxt(f_name, delimiter=',')
+curvatures = np.zeros((n_bootstraps, 2)) # 1st column: c_null, 2nd colum: c_est; both columns are independent of each other and the order within columns does not matter
+# curvatures = genfromtxt(f_name, delimiter=',')
 
 print(f'{subject}_{category}_{eccentricity}_{movie_id:02d}_{dat_movie_name}')
-for iboot in range(76, n_bootstraps):
-# for iboot in range(n_bootstraps):
+# for iboot in range(76, n_bootstraps):
+for iboot in range(n_bootstraps):
     t = time.perf_counter()
 
     print(f'Bootstrap: {iboot} \n')
