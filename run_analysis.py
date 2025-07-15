@@ -14,7 +14,7 @@ from modules import optimize_null, forward_simulation
 
 # data settings
 subject = 'ryan'
-category = 'natural'
+category = 'synthetic'
 eccentricity = 'periphery'
 movie_id = 5
 diameter = 36; # 6, 24, 36
@@ -57,7 +57,7 @@ for itrial in range(n_trials):
 curvatures = genfromtxt(f_name, delimiter=',')
 
 print(f'{subject}_{category}_{eccentricity}_{movie_id:02d}_{dat_movie_name}')
-for iboot in range(45, n_bootstraps):
+for iboot in range(76, n_bootstraps):
 # for iboot in range(n_bootstraps):
     t = time.perf_counter()
 
