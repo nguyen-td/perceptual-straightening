@@ -16,7 +16,7 @@ from modules import optimize_null, forward_simulation
 # load yoon's summary data file
 df = pd.read_csv(Path('data') / 'perceptual_summary_Feb2020.csv')
 
-for isubj in range(6, len(df)):
+for isubj in range(10, len(df)):
 
     # data settings
     # subject = 'ryan'
@@ -86,36 +86,41 @@ for isubj in range(6, len(df)):
     print(f'{subject}_{category}_{eccentricity}_{movie_id:02d}_{dat_movie_name}')
     # for iboot in range(76, n_bootstraps):
     for iboot in range(n_bootstraps):
-        t = time.perf_counter()
+        try:
+            t = time.perf_counter()
 
-        print(f'Bootstrap: {iboot} \n')
-        
-        # # compute null model
-        # print('Compute null model: ...')
-        # is_natural = True if category == 'natural' else False
-        # x_null, c_pixel, c_null, prob_corr_human, prob_corr_null = optimize_null(stim_folder, n_corr_obs, n_total_obs, n_dim=n_dim, n_starts=10, n_iter=10000, n_frames=n_frames, is_natural=is_natural, version=1, disp=False)
+            print(f'Bootstrap: {iboot} \n')
+            
+            # # compute null model
+            # print('Compute null model: ...')
+            # is_natural = True if category == 'natural' else False
+            # x_null, c_pixel, c_null, prob_corr_human, prob_corr_null = optimize_null(stim_folder, n_corr_obs, n_total_obs, n_dim=n_dim, n_starts=10, n_iter=10000, n_frames=n_frames, is_natural=is_natural, version=1, disp=False)
 
-        # # synthesize data from null model
-        # print('\nSynthesize data from null model: ...')
-        # n_reps = 10
-        # prob_corr_null_sim, n_total_obs_null_sim = forward_simulation(x_null.squeeze(), n_reps)
+            # # synthesize data from null model
+            # print('\nSynthesize data from null model: ...')
+            # n_reps = 10
+            # prob_corr_null_sim, n_total_obs_null_sim = forward_simulation(x_null.squeeze(), n_reps)
 
-        # print('\nEstimate curvature from null model observer data: ...')
-        # n_corr_obs_null = np.round(n_total_obs_null_sim * prob_corr_null_sim)
-        # elbo_null = ELBO(n_dim, n_corr_obs_null, n_total_obs_null_sim, n_starts=n_starts, n_iterations=n_iterations, verbose=False)
-        # _, _, _, _, _, _, _, _, _, _, _, c_est_null = elbo_null.optimize_ELBO_SGD()
-        # curvatures[iboot, 0] = torch.rad2deg(torch.mean(c_est_null)).detach().numpy()
+            # print('\nEstimate curvature from null model observer data: ...')
+            # n_corr_obs_null = np.round(n_total_obs_null_sim * prob_corr_null_sim)
+            # elbo_null = ELBO(n_dim, n_corr_obs_null, n_total_obs_null_sim, n_starts=n_starts, n_iterations=n_iterations, verbose=False)
+            # _, _, _, _, _, _, _, _, _, _, _, c_est_null = elbo_null.optimize_ELBO_SGD()
+            # curvatures[iboot, 0] = torch.rad2deg(torch.mean(c_est_null)).detach().numpy()
 
-        # run estimation on real data
-        print('\nEstimate curvature from human observer data: ...')
-        elbo = ELBO(n_dim, n_corr_obs, n_total_obs, n_starts=n_starts, n_iterations=n_iterations, verbose=False)
-        _, _, _, _, _, _, _, _, _, _, _, c_est = elbo.optimize_ELBO_SGD()
-        curvatures[iboot, 1] = torch.rad2deg(torch.mean(c_est)).detach().numpy()
+            # run estimation on real data
+            print('\nEstimate curvature from human observer data: ...')
+            elbo = ELBO(n_dim, n_corr_obs, n_total_obs, n_starts=n_starts, n_iterations=n_iterations, verbose=False)
+            _, _, _, _, _, _, _, _, _, _, _, c_est = elbo.optimize_ELBO_SGD()
+            curvatures[iboot, 1] = torch.rad2deg(torch.mean(c_est)).detach().numpy()
 
-        # save file
-        np.savetxt(f_name , curvatures, delimiter=',')
+            # save file
+            np.savetxt(f_name , curvatures, delimiter=',')
 
-        elapsed = time.perf_counter() - t
-        print(f'Elapsed: {elapsed} seconds.')
+            elapsed = time.perf_counter() - t
+            print(f'Elapsed: {elapsed} seconds.')
 
-        print('---------------------------------------------------------------------------------')
+            print('---------------------------------------------------------------------------------')
+        except:
+            print('Something went wrong')
+        finally:
+            continue
