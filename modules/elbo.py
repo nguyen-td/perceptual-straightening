@@ -39,9 +39,6 @@ class ELBO(nn.Module):
         Regularization factor to ensure numerical stability for computing the Cholesky decomposition
     verbose: Boolean
         If True, outputs progress bar.
-    c_pixel: (1 x n_frames - 2) Torch tensor or None
-        If not None, c will not be a free parameter but will be set to 'c_pixel'. Can be used to compute null model where 'c' 
-        is set to be the same as the pixel-domain curvature
     """
     
     def __init__(self,  
@@ -53,8 +50,7 @@ class ELBO(nn.Module):
                  n_starts=10,
                  n_samples=100,
                  eps=1e-6,
-                 verbose=True,
-                 c_pixel=None
+                 verbose=True
                 ):
         super(ELBO, self).__init__()
 
@@ -67,7 +63,6 @@ class ELBO(nn.Module):
         self.n_starts = n_starts
         self.eps = eps
         self.verbose = verbose
-        self.c_pixel = c_pixel
 
     def optimize_ELBO_SGD(self):
         """
@@ -110,22 +105,17 @@ class ELBO(nn.Module):
         self.mu_post_a = nn.Parameter(a.squeeze())
         self.mu_post_l = nn.Parameter(self._transform(torch.tensor([0.0]), 'l'))
 
-        if self.c_pixel is None:
-            self.mu_post_c = nn.Parameter(c.squeeze())
-            self.mu_post_inits = torch.hstack((self.mu_post_d, self.mu_post_c, self.mu_post_a.flatten(), self.mu_post_l))
-        else:
-            self.mu_post_inits = torch.hstack((self.mu_post_d, self.mu_post_a.flatten(), self.mu_post_l))
+        self.mu_post_c = nn.Parameter(c.squeeze())
+        self.mu_post_inits = torch.hstack((self.mu_post_d, self.mu_post_c, self.mu_post_a.flatten(), self.mu_post_l))
         self.sigma_post = nn.Parameter(torch.eye(len(self.mu_post_inits)))
 
         self.mu_prior_d = nn.Parameter(self._transform(torch.tensor([1.0]), 'd'))
-        if self.c_pixel is None:
-            self.mu_prior_c = nn.Parameter(torch.deg2rad(torch.tensor(60.0)))
+        self.mu_prior_c = nn.Parameter(torch.deg2rad(torch.tensor(60.0)))
         self.mu_prior_a = nn.Parameter(torch.zeros(self.n_dim), requires_grad=False) 
         self.mu_prior_l = nn.Parameter(self._transform(torch.tensor([0.0]), 'l'), requires_grad=False)
 
         d_size = self.n_frames - 1
-        if self.c_pixel is None:
-            c_size = self.n_frames - 2
+        c_size = self.n_frames - 2
         a_size = self.n_dim * (self.n_frames - 2)
 
         # A = torch.hstack((self.mu_post_d, self.mu_post_c, self.mu_post_a.flatten(), self.mu_post_l))
@@ -135,11 +125,8 @@ class ELBO(nn.Module):
         # self.sigma_post = nn.Parameter(sigma_post)
 
         self.sigma_prior_d = nn.Parameter(torch.var(self.mu_post_d, correction=True, keepdim=True) + torch.mean(self.sigma_post[:d_size]))
-        if self.c_pixel is None:
-            self.sigma_prior_c = nn.Parameter(torch.var(self.mu_post_c, correction=True, keepdim=True) + torch.mean(self.sigma_post[d_size:d_size + c_size]))
-            self.sigma_prior_a = nn.Parameter(torch.var(self.mu_post_a, dim=1, correction=True) + torch.mean(self.sigma_post[d_size + c_size:d_size + c_size + a_size]))
-        else:
-            self.sigma_prior_a = nn.Parameter(torch.var(self.mu_post_a, dim=1, correction=True) + torch.mean(self.sigma_post[d_size:d_size + a_size]))
+        self.sigma_prior_c = nn.Parameter(torch.var(self.mu_post_c, correction=True, keepdim=True) + torch.mean(self.sigma_post[d_size:d_size + c_size]))
+        self.sigma_prior_a = nn.Parameter(torch.var(self.mu_post_a, dim=1, correction=True) + torch.mean(self.sigma_post[d_size + c_size:d_size + c_size + a_size]))
         # self.sigma_prior_d = nn.Parameter(torch.tensor([0.001]))
         # self.sigma_prior_c = nn.Parameter(torch.tensor([0.5]))
         # self.sigma_prior_a = nn.Parameter(torch.tensor([5.0]).repeat(self.n_dim))
@@ -154,13 +141,11 @@ class ELBO(nn.Module):
         ll_loss = torch.zeros(self.n_iterations)
 
         # track free parameters
-        if self.c_pixel is None:
-            c_prior = torch.zeros(self.n_iterations)
+        c_prior = torch.zeros(self.n_iterations)
         d_prior = torch.zeros(self.n_iterations)
         l_prior = torch.zeros(self.n_iterations)
 
-        if self.c_pixel is None:
-            c_post = torch.zeros(self.n_frames - 2, self.n_iterations)
+        c_post = torch.zeros(self.n_frames - 2, self.n_iterations)
         d_post = torch.zeros(self.n_frames - 1, self.n_iterations)
         l_post = torch.zeros(self.n_iterations)
 
@@ -187,9 +172,8 @@ class ELBO(nn.Module):
             kl_loss[i] = kl.item()
             ll_loss[i] = log_ll.item()
 
-            if self.c_pixel is None:
-                c_prior[i] = torch.rad2deg(self._transform(self.mu_prior_c, 'c').detach())
-                c_post[:, i] = torch.rad2deg(self._transform(self.mu_post_c, 'c').detach())
+            c_prior[i] = torch.rad2deg(self._transform(self.mu_prior_c, 'c').detach())
+            c_post[:, i] = torch.rad2deg(self._transform(self.mu_post_c, 'c').detach())
 
             d_prior[i] = self._transform(self.mu_prior_d, 'd').detach()
             l_prior[i] = self._transform(self.mu_prior_l, 'l').detach()
@@ -244,12 +228,8 @@ class ELBO(nn.Module):
                 l_post = l_post[:i]
                 break
         
-        if self.c_pixel is None:
-            x, p, _, c_est = compute_hierarchical_ll(1, self.n_frames, self.n_dim, self.n_corr_obs, self.n_total_obs, self._transform(self.mu_post_d, 'd').unsqueeze(0), self.mu_post_c.unsqueeze(0), self.mu_post_a.unsqueeze(0), self._transform(self.mu_post_l, 'l'))
-            return x, p, errors, kl_loss, ll_loss, c_prior, d_prior, l_prior, c_post, d_post, l_post, c_est
-        else:
-            x, p, _, c_est = compute_hierarchical_ll(1, self.n_frames, self.n_dim, self.n_corr_obs, self.n_total_obs, self._transform(self.mu_post_d, 'd').unsqueeze(0), self.c_pixel, self.mu_post_a.unsqueeze(0), self._transform(self.mu_post_l, 'l'))
-            return x, p, errors, kl_loss, ll_loss, d_prior, l_prior, d_post, l_post, c_est
+        x, p, _, c_est = compute_hierarchical_ll(1, self.n_frames, self.n_dim, self.n_corr_obs, self.n_total_obs, self._transform(self.mu_post_d, 'd').unsqueeze(0), self.mu_post_c.unsqueeze(0), self.mu_post_a.unsqueeze(0), self._transform(self.mu_post_l, 'l'))
+        return x, p, errors, kl_loss, ll_loss, c_prior, d_prior, l_prior, c_post, d_post, l_post, c_est
 
     def _make_prior_posterior(self):
         """
@@ -265,25 +245,15 @@ class ELBO(nn.Module):
         
         """
         # define means and covariances of the prior, extend the dimension of mu and sigma to match those of the posterior
-        if self.c_pixel is None:
-            mu_prior = torch.cat((self._transform(self.mu_prior_d, 'd').repeat(self.n_frames - 1), 
-                                self._transform(self.mu_prior_c, 'c').repeat(self.n_frames - 2), 
-                                self.mu_prior_a.repeat((self.n_frames - 2)), 
-                                self._transform(self.mu_prior_l, 'l')), 0)
-            sigma_prior = torch.block_diag(torch.diag(self.sigma_prior_d.repeat(self.n_frames - 1)), 
-                                        torch.diag(self.sigma_prior_c.repeat(self.n_frames - 2)), 
-                                        torch.diag(self.sigma_prior_a.repeat(self.n_frames - 2)), 
-                                        torch.diag(self.sigma_prior_l))
-            mu_post = torch.cat((self._transform(self.mu_post_d, 'd'), self._transform(self.mu_post_c, 'c'), self.mu_post_a.flatten(), self._transform(self.mu_post_l, 'l')))
-        else:
-            mu_prior = torch.cat((self._transform(self.mu_prior_d, 'd').repeat(self.n_frames - 1), 
-                                self.mu_prior_a.repeat((self.n_frames - 2)), 
-                                self._transform(self.mu_prior_l, 'l')), 0)
-            sigma_prior = torch.block_diag(torch.diag(self.sigma_prior_d.repeat(self.n_frames - 1)), 
-                                        torch.diag(self.sigma_prior_a.repeat(self.n_frames - 2)), 
-                                        torch.diag(self.sigma_prior_l))
-            mu_post = torch.cat((self._transform(self.mu_post_d, 'd'), self.mu_post_a.flatten(), self._transform(self.mu_post_l, 'l')))
-
+        mu_prior = torch.cat((self._transform(self.mu_prior_d, 'd').repeat(self.n_frames - 1), 
+                            self._transform(self.mu_prior_c, 'c').repeat(self.n_frames - 2), 
+                            self.mu_prior_a.repeat((self.n_frames - 2)), 
+                            self._transform(self.mu_prior_l, 'l')), 0)
+        sigma_prior = torch.block_diag(torch.diag(self.sigma_prior_d.repeat(self.n_frames - 1)), 
+                                    torch.diag(self.sigma_prior_c.repeat(self.n_frames - 2)), 
+                                    torch.diag(self.sigma_prior_a.repeat(self.n_frames - 2)), 
+                                    torch.diag(self.sigma_prior_l))
+        mu_post = torch.cat((self._transform(self.mu_post_d, 'd'), self._transform(self.mu_post_c, 'c'), self.mu_post_a.flatten(), self._transform(self.mu_post_l, 'l')))
         _, L_prior = make_positive_definite(sigma_prior, self.eps)
         prior = D.MultivariateNormal(mu_prior, scale_tril=L_prior)
 
@@ -394,32 +364,18 @@ class ELBO(nn.Module):
         a_size = (self.n_dim) * (self.n_frames - 2)
 
         # extract variables
-        if self.c_pixel is None:
-            d = z_q[:, :d_size]
-            c = z_q[:, d_size:d_size + c_size]
-            a = z_q[:, d_size + c_size:d_size + c_size + a_size].reshape(-1, self.n_dim, self.n_frames - 2)
-            l = z_q[:, -1]
+        d = z_q[:, :d_size]
+        c = z_q[:, d_size:d_size + c_size]
+        a = z_q[:, d_size + c_size:d_size + c_size + a_size].reshape(-1, self.n_dim, self.n_frames - 2)
+        l = z_q[:, -1]
 
-            # transform variables (note: a is not transformed here yet because it depends on previous displacement vector; 
-            # will be transformed during trajectory generation)
-            d = self._transform(d, 'd')
-            l = self._transform(l, 'l')
-            c = self._transform(c, 'c')
-        else:
-            d = z_q[:, :d_size]
-            a = z_q[:, d_size:d_size + a_size].reshape(-1, self.n_dim, self.n_frames - 2)
-            l = z_q[:, -1]
+        # transform variables (note: a is not transformed here yet because it depends on previous displacement vector; 
+        # will be transformed during trajectory generation)
+        d = self._transform(d, 'd')
+        l = self._transform(l, 'l')
+        c = self._transform(c, 'c')
 
-            # transform variables (note: a is not transformed here yet because it depends on previous displacement vector; 
-            # will be transformed during trajectory generation)
-            d = self._transform(d, 'd')
-            l = self._transform(l, 'l')
-
-        if self.c_pixel is None:
-            _, _, log_ll, _ = compute_hierarchical_ll(n_samples, self.n_frames, self.n_dim, n_corr_obs, n_total_obs, d, c, a, l)
-        else:
-            _, _, log_ll, _ = compute_hierarchical_ll(n_samples, self.n_frames, self.n_dim, n_corr_obs, n_total_obs, d, self.c_pixel.expand(self.n_samples, -1), a, l)
-
+        _, _, log_ll, _ = compute_hierarchical_ll(n_samples, self.n_frames, self.n_dim, n_corr_obs, n_total_obs, d, c, a, l)
         return torch.mean(log_ll)
     
     def compute_loss(self, log_ll, kl_divergence):
