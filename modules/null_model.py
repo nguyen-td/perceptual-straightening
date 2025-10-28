@@ -33,6 +33,19 @@ def optimize_null(stim_folder, n_corr_obs, n_total_obs, n_dim, n_starts=10, n_it
     version: 1 or 2
         Which optimization version to use. Version 1 is based on minimizing the negative log likelihood (MLE), version 2 minimizes the MSE between the 
         human and estimated probabilities of correct responses. Default is 1.
+
+    Outputs:
+    --------
+    x_null: (1 x n_dim x n_frames) Torch tensor
+        Estimated perceptual locations 
+    c_pixel: (n_frames - 2) Torch tensor
+        Estimated local curvatures
+    c_est: (n_frames - 2) Torch tensor
+        Estimated local perceptual curvatures
+    prop_corr: (n_frames x n_frames) Torch tensor
+        Proportion correct as computed from human psychophysics data
+    prop_est: (1 x n_frames x n_frames) Torch tensor
+        Estimated proportion correct
     """
 
     im_category = 'natural' if is_natural else 'synthetic'
@@ -60,6 +73,7 @@ def optimize_null(stim_folder, n_corr_obs, n_total_obs, n_dim, n_starts=10, n_it
     elif version == 2:
         elbo = ELBO(n_dim, n_corr_obs, n_total_obs, n_starts=n_starts, n_iterations=n_iter, c_pixel=c_pixel)
         x, prob_est, _, _, _, _, _, _, _, c_est = elbo.optimize_ELBO_SGD()
+        prob_est = prob_est.detach().numpy()
     else:
         def func_binomial_prob(vec):
             # get perceptual locations
@@ -122,4 +136,4 @@ def optimize_null(stim_folder, n_corr_obs, n_total_obs, n_dim, n_starts=10, n_it
         binomial = torch.distributions.Binomial(torch.tensor(n_corr_obs), probs=p)
         prob_est = binomial.log_prob(torch.tensor(n_corr_obs)).exp()
 
-    return x, c_pixel, c_est, prob_corr, prob_est
+    return x, c_pixel, c_est, prob_corr, np.squeeze(prob_est)
