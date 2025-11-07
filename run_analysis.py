@@ -85,6 +85,7 @@ for isubj in range(10, len(df)):
 
     print(f'{subject}_{category}_{eccentricity}_{movie_id:02d}_{dat_movie_name}')
     # for iboot in range(76, n_bootstraps):
+    # TODO: Parallelize for loop
     for iboot in range(n_bootstraps):
         try:
             t = time.perf_counter()

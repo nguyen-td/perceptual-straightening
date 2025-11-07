@@ -50,7 +50,7 @@ def forward_simulation(x, n_reps, var=1.0, abort_prob=0.1):
                     else:
                         trial_mat[i_reps, i_pair] = 0 # incorrect response
                 else:
-                    sim_X = np.random.multivariate_normal(x[:, all_pairs[i_pair, 1]], sigma) # X = A
+                    sim_X = np.random.multivariate_normal(x[:, all_pairs[i_pair, 1]], sigma) # X = B
                     dist_AX = np.linalg.norm(sim_A - sim_X)
                     dist_BX = np.linalg.norm(sim_B - sim_X)
                     if dist_BX < dist_AX:

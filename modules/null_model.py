@@ -137,3 +137,66 @@ def optimize_null(stim_folder, n_corr_obs, n_total_obs, n_dim, n_starts=10, n_it
         prob_est = binomial.log_prob(torch.tensor(n_corr_obs)).exp()
 
     return x, c_pixel, c_est, prob_corr, np.squeeze(prob_est)
+
+def construct_null_trajectory(stim_folder, n_dim, d_perc, a_perc, is_natural=True, n_frames=11):
+    """
+    Construct a null trajectory by taking a most likely trajectory, estimated from human data, and 
+    replace its curvatures with pixel-domain curvatures.
+
+    Inputs:
+    -------
+    stim_folder: String
+        String containing the location of the stimulus (i.e. movies)
+    n_dim: Scalar
+        Number of dimensions
+    d_perc: (n_frames - 1) Torch tensor
+        Most likely perceptual distance vector
+    a_perc: (n_dim x n_frames) Torch tensor
+        Most likely perceptual acceleration vectors
+    n_frames: Scalar
+        Number of frames. Default is 11.
+    is_natural: Boolean
+        Whether the stimulus is natural (True) or synthetic (False). Default is True.
+
+    Output:
+    -------
+    x: (n_samples x n_dim x n_frames) Torch tensor
+        Perceptual locations under the null model
+    c_est: (n_frames - 2) Torch tensor
+        Estimated local curvatures
+    p: (n_frames x n_frames) Numpy array
+        Estimated proportion correct
+    """
+    
+    im_category = 'natural' if is_natural else 'synthetic'
+
+    # load videos 
+    im = []
+    for fname in sorted(os.listdir(stim_folder)):
+        if not is_natural and (fname == f'natural01.png'): # first and last frames for synthetic videos are the same as for natural videos
+            im.append(imageio.imread(Path(stim_folder) / fname))
+        if im_category in fname:
+            im_path = os.path.join(stim_folder, fname)
+            im.append(imageio.imread(im_path))
+    if not is_natural:
+        im.append(imageio.imread(Path(stim_folder) / f'natural{n_frames:02d}.png')) # last frame
+
+    # convert to 3D array and normalize to [0, 1]
+    I = np.stack(im, axis=-1).astype(np.float64) / 255
+
+    # compute pixel-domain curvature
+    c_pixel = torch.tensor(compute_curvature_pixel(I))
+
+    # construct null trajectory
+    x, _, c_est, _, _ = compute_trajectory_perceptual(1, n_frames, n_dim, d_perc.unsqueeze(0), c_pixel.unsqueeze(0), a_perc.unsqueeze(0))
+
+     # get perceptual distances
+    dist = torch.cdist(torch.transpose(x, 1, 2), torch.transpose(x, 1, 2))
+
+    # compute hierarchical model
+    l = 0.06; # guess rate
+    normal = torch.distributions.Normal(torch.tensor([0.0]), torch.tensor([1.0])) # cdf of the standard normal
+    p_axb = normal.cdf(dist / np.sqrt(2)) * normal.cdf(dist / 2) + normal.cdf(-dist / np.sqrt(2)) * normal.cdf(-dist / 2)
+    p = (1 - 2 * l) * p_axb.clone() + l
+
+    return x, c_est, p

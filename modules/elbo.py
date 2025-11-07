@@ -151,7 +151,7 @@ class ELBO(nn.Module):
 
         # run optimization
         eps_prior = 10**(-3) # stops when c_prior(t) - c_prior(t-1) is eps_prior for 5 consecutive iterations
-        conv_iter = 5
+        conv_iter = 10
         count_conv = 0
         for i in range(self.n_iterations):
 

@@ -8,7 +8,7 @@ from scipy.optimize import minimize
 from modules import compute_trajectory_perceptual, compute_curvature_pixel
 from utils import make_positive_definite
 
-def optimize_MLE(n_dim, n_corr_obs, n_total_obs, n_iter=1000, verbose=True, n_starts=10, c_pixel=None, disp=False):
+def optimize_MLE(n_dim, n_corr_obs, n_total_obs, n_iter=1000, verbose=True, n_starts=10, disp=False):
     """
     Run maximum likelihood estimation (MLE) to estimate perceptual trajectories from perceptual observations. Uses polar coordinates.
 
@@ -26,9 +26,6 @@ def optimize_MLE(n_dim, n_corr_obs, n_total_obs, n_iter=1000, verbose=True, n_st
         If True, outputs progress bar.
     n_starts: Scalar
         Number of multistarts
-    c_pixel: (1 x n_frames - 2) Torch tensor or None
-        If not None, c will not be a free parameter but will be set to 'c_pixel'. Can be used to compute null model where 'c' 
-        is set to be the same as the pixel-domain curvature
 
     Outputs:
     --------
@@ -57,15 +54,10 @@ def optimize_MLE(n_dim, n_corr_obs, n_total_obs, n_iter=1000, verbose=True, n_st
         Returns negative log likelihood. 
         '''
         # get perceptual locations
-        if c_pixel is None:
-            c_ = torch.tensor(vec[:n_frames - 2]).unsqueeze(0)
-            d_ = torch.tensor(vec[n_frames-2:n_frames-2 + n_frames-1]).unsqueeze(0)
-            a_ = torch.tensor(start_vec[n_frames-2 + n_frames-1:].reshape(n_dim, n_frames - 2)).unsqueeze(0)
-            x, _, _, _, _ = compute_trajectory_perceptual(1, n_frames, n_dim, d_, c_, a_)
-        else:
-            d_ = torch.tensor(vec[:n_frames-1]).unsqueeze(0)
-            a_ = torch.tensor(vec[n_frames-1:].reshape(n_dim, n_frames - 2)).unsqueeze(0)
-            x, _, _, _, _ = compute_trajectory_perceptual(1, n_frames, n_dim, d_, c_pixel, a_)
+        c_ = torch.tensor(vec[:n_frames - 2]).unsqueeze(0)
+        d_ = torch.tensor(vec[n_frames-2:n_frames-2 + n_frames-1]).unsqueeze(0)
+        a_ = torch.tensor(start_vec[n_frames-2 + n_frames-1:].reshape(n_dim, n_frames - 2)).unsqueeze(0)
+        x, _, _, _, _ = compute_trajectory_perceptual(1, n_frames, n_dim, d_, c_, a_)
 
         # get perceptual distances
         dist = torch.cdist(torch.transpose(x, 1, 2), torch.transpose(x, 1, 2))
@@ -84,44 +76,26 @@ def optimize_MLE(n_dim, n_corr_obs, n_total_obs, n_iter=1000, verbose=True, n_st
     for i in range(n_starts):
 
         # initialize parameters
-        if c_pixel is None:
-            c_init = np.deg2rad(np.abs(np.random.normal(60, 10, size=((n_frames - 2)))))
-            d_init = np.abs(np.random.normal(1, 0.5, size=((n_frames - 1))))
-            a_init = np.random.normal(0, 2, size=((n_dim, n_frames - 2)))
-            l = 0.06; # guess rate
-            start_vec = np.concatenate((c_init, d_init, a_init.flatten()))
+        c_init = np.deg2rad(np.abs(np.random.normal(60, 10, size=((n_frames - 2)))))
+        d_init = np.abs(np.random.normal(1, 0.5, size=((n_frames - 1))))
+        a_init = np.random.normal(0, 2, size=((n_dim, n_frames - 2)))
+        l = 0.06; # guess rate
+        start_vec = np.concatenate((c_init, d_init, a_init.flatten()))
 
-            LB = np.zeros(np.size(start_vec))
-            UB = np.zeros(np.size(start_vec))
+        LB = np.zeros(np.size(start_vec))
+        UB = np.zeros(np.size(start_vec))
 
-            # bounds for c
-            LB[:n_frames-2] = 0
-            UB[:n_frames-2] = np.pi
+        # bounds for c
+        LB[:n_frames-2] = 0
+        UB[:n_frames-2] = np.pi
 
-            # bounds for d
-            LB[n_frames-2:n_frames-2 + n_frames-1] = 0
-            UB[n_frames-2:n_frames-2 + n_frames-1] = 3
+        # bounds for d
+        LB[n_frames-2:n_frames-2 + n_frames-1] = 0
+        UB[n_frames-2:n_frames-2 + n_frames-1] = 3
 
-            # bounds for a
-            LB[n_frames-2 + n_frames-1:] = -100
-            UB[n_frames-2 + n_frames-1:] = 100
-
-        else: # c will not be a free parameter
-            d_init = np.abs(np.random.normal(1, 0.5, size=((n_frames - 1))))
-            a_init = np.random.normal(0, 2, size=((n_dim, n_frames - 2)))
-            l = 0.06; # guess rate
-            start_vec = np.concatenate((d_init, a_init.flatten()))
-
-            LB = np.zeros(np.size(start_vec))
-            UB = np.zeros(np.size(start_vec))
-
-            # bounds for d
-            LB[:n_frames-1] = 0
-            UB[:n_frames-1] = 3
-
-            # bounds for a
-            LB[n_frames-1:] = -100
-            UB[n_frames-1:] = 100
+        # bounds for a
+        LB[n_frames-2 + n_frames-1:] = -100
+        UB[n_frames-2 + n_frames-1:] = 100
 
         # set bounds
         bnds = np.zeros((np.size(LB), 2))
@@ -136,15 +110,10 @@ def optimize_MLE(n_dim, n_corr_obs, n_total_obs, n_iter=1000, verbose=True, n_st
 
             if new_loss < old_loss:
                 # reconstruct trajectory
-                if c_pixel is None:
-                    c = torch.tensor(res.x[:n_frames - 2]).unsqueeze(0)
-                    d = torch.tensor(res.x[n_frames-2:n_frames-2 + n_frames-1]).unsqueeze(0)
-                    a = torch.tensor(res.x[n_frames-2 + n_frames-1:].reshape(n_dim, n_frames - 2)).unsqueeze(0)
-                    x, _, c_est, _, _ = compute_trajectory_perceptual(1, n_frames, n_dim, d, c, a)
-                else:
-                    d = torch.tensor(res.x[:n_frames-1]).unsqueeze(0)
-                    a = torch.tensor(res.x[n_frames-1:].reshape(n_dim, n_frames - 2)).unsqueeze(0)
-                    x, _, c_est, _, _ = compute_trajectory_perceptual(1, n_frames, n_dim, d, c_pixel, a)
+                c = torch.tensor(res.x[:n_frames - 2]).unsqueeze(0)
+                d = torch.tensor(res.x[n_frames-2:n_frames-2 + n_frames-1]).unsqueeze(0)
+                a = torch.tensor(res.x[n_frames-2 + n_frames-1:].reshape(n_dim, n_frames - 2)).unsqueeze(0)
+                x, _, c_est, _, _ = compute_trajectory_perceptual(1, n_frames, n_dim, d, c, a)
 
                 # get perceptual distances
                 dist = torch.cdist(torch.transpose(x, 1, 2), torch.transpose(x, 1, 2))
@@ -165,7 +134,4 @@ def optimize_MLE(n_dim, n_corr_obs, n_total_obs, n_iter=1000, verbose=True, n_st
         if verbose:
             print(f"Iteration {i+1} | Loss: {res.fun}")
 
-    if c_pixel is None:
-        return x, c_est, p, c, d, a, inv_hess
-    else:
-        return x, c_est, p
+    return x, c_est, p, c, d, a, inv_hess

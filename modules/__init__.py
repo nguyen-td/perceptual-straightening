@@ -3,4 +3,4 @@ from .geometry import orthogonalize_acc, compute_trajectory_perceptual, compute_
 from .optimization import optimize_MLE
 from .forward_simulation import forward_simulation
 from .elbo import ELBO
-from .null_model import optimize_null
+from .null_model import optimize_null, construct_null_trajectory
