@@ -9,12 +9,12 @@ import matplotlib.pyplot as plt
 
 
 # load video
-subject = 'yb'
+subject = 'alexandra'
 category = 'synthetic'
-eccentricity = 'parafovea'
-movie_id = 4
+eccentricity = 'fovea'
+movie_id = 6
 diameter = 6; # 6, 24, 36
-movie_name = 'egomotion'
+movie_name = 'carnegie-dam'
 
 # read in natural image frames
 v_folder = os.path.join('data', 'yoon_stimulus', f'diameter_{diameter:02d}_deg', f'movie{movie_id:02d}-{movie_name}')

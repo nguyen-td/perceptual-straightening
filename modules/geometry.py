@@ -104,16 +104,24 @@ def compute_curvature_pixel(I):
     n_frames = I.shape[2]
 
     # compute local trajectory
+    # v = np.diff(I)
+    # v_hat = np.zeros((v.shape[0] * v.shape[1], v.shape[2]))
+
+    # for iframe in range(v.shape[2]):
+    #     v_t = v[:, :, iframe]
+    #     v_hat[:, iframe] = v_t.flatten() / np.linalg.norm(v_t.flatten())
+
+    # c = np.zeros((n_frames - 2))
+    # for iframe in range(n_frames - 2):
+    #     c[iframe] = np.arccos(np.dot(v_hat[:, iframe], v_hat[:, iframe+1]))
+
+    # compute local trajectory
     v = np.diff(I)
-    v_hat = np.zeros((v.shape[0] * v.shape[1], v.shape[2]))
+    v_hat = v.reshape(-1, n_frames-1) / np.linalg.norm(v.reshape(-1, n_frames-1), axis=0)
 
-    for iframe in range(v.shape[2]):
-        v_t = v[:, :, iframe]
-        v_hat[:, iframe] = v_t.flatten() / np.linalg.norm(v_t.flatten())
-
-    c = np.zeros((n_frames - 2))
-    for iframe in range(n_frames - 2):
-        c[iframe] = np.arccos(np.dot(v_hat[:, iframe], v_hat[:, iframe+1]))
+    v_hat1 = v_hat[:, 0:n_frames-2]
+    v_hat2 = v_hat[:, 1:n_frames-1]
+    c = np.arccos(np.vecdot(v_hat1, v_hat2, axis=0))
 
     return c
 
