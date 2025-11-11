@@ -8,12 +8,12 @@ clc
 addpath(genpath('/Users/tn22693/GitHub/perceptual-straightening/'))
 
 %% Load data
-dat_name = 'sim_0125.mat';
-load(['data/sim/' dat_name])
+dat_name = 'sim_nframes-06_nreps-10_0001.mat';
+load(['data/sim/jiaming/' dat_name])
 
 %% Plot psychometric function
 n_frames = size(S{1}.Pc_reshaped, 1);
-rep_idx = 1; 
+rep_idx = 4; 
 % sim_0002, rep 6: 73%, 75% at 3 frames
 % sim_0004, rep 1: 75%, 75% at 3 frames
 % sim_0005, rep 5: 68%, 75% at 3.5 frames

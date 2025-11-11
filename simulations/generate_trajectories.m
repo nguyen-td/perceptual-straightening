@@ -9,12 +9,12 @@ clc;
 addpath('/Users/tn22693/GitHub/perceptual-straightening/simulations')
 % save_data_path = '/Users/nguyentiendung/GitHub/perceptual-straightening/data';
 % save_data_path = '/Users/tn22693/GitHub/perceptual-straightening/data';
-save_data_path = '/Users/gorislab/Documents/GitHub/perceptual-straightening/data/sim';
+save_data_path = '/Users/tn22693/GitHub/perceptual-straightening/data/sim/jiaming';
 
 %% Set trajectory generation settings
 
 % number of simulations for a fixed set of parameter combinations
-n_sims_per_param = 100; 
+n_sims_per_param = 10; 
 
 % determines the first file number, e.g., if 15, the first script is saved as 'sim_015.mat'
 file_number = 1;
@@ -23,20 +23,22 @@ file_number = 1;
 
 %% Set parameters 
 
-n_frames = 11;
+n_frames = 6;
 n_reps = 10;
 abort_prob = 10;
 
-% d_mu = 1;
-d_mu = 1:1:3;
-d_sigma = 0.75;
+d_mu = 1;
+% d_mu = 1:1:2;
+d_sigma = 0.3;
 
 % c_mu = 45;
 c_mu = 0:20:180;
-c_sigma = 0:10:50;
+% c_sigma = 0:10:50;
+c_sigma = 2;
 
 a_mu = 0;
-a_sigma = 1:2:11; % a_sigma > 0
+% a_sigma = 1:2:11; % a_sigma > 0
+a_sigma = 3;
 
 %% Simulate trajectories and save trajectories
 for iparam_a_sigma = 1:numel(a_sigma)
@@ -73,7 +75,8 @@ for iparam_a_sigma = 1:numel(a_sigma)
                     S{isim}.generative_params.a_sigma    = a_sigma(iparam_a_sigma);
             
                 end
-                save(fullfile(save_data_path, ['sim_' sprintf('%04d', file_number) '.mat']), 'S')
+                % save(fullfile(save_data_path, ['sim_' sprintf('%04d', file_number) '.mat']), 'S')
+                save(fullfile(save_data_path, ['sim_nframes-' sprintf('%02d', n_frames) '_nreps-' sprintf('%02d', n_reps) '_' sprintf('%04d', file_number) '.mat']), 'S')
                 % disp('Saved')
                 file_number = file_number + 1;
             end
