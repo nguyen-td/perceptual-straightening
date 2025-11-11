@@ -21,7 +21,7 @@ def process_sim(S_dat, save_path):
         n_dim = 5
         c_true = np.mean(np.rad2deg(S_dat['c'][0, 0]).flatten())
 
-        elbo = ELBO(n_dim, n_corr_obs, n_total_obs, n_starts=1, n_iterations=2)
+        elbo = ELBO(n_dim, n_corr_obs, n_total_obs, n_starts=10, n_iterations=40000)
         _, _, _, _, _, _, _, _, _, _, _, c_est = elbo.optimize_ELBO_SGD()
 
         # convert curvature estimates to degrees
