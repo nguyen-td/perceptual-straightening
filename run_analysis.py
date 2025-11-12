@@ -92,7 +92,7 @@ for f_name in data:
         f_name = Path(save_path) / f'curvatures_{subject}_{category}_{eccentricity}_{movie_id:02d}_{dat_movie_name}.csv'
 
         # optimization settings
-        n_bootstraps = 10
+        n_bootstraps = 100
         n_iterations = 40000
         n_reps = 10
         n_starts = 10 # multistarts for MLE, used for initializing posterior of the hierarchical variational inference algorithm
