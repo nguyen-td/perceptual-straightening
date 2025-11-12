@@ -2,6 +2,7 @@ import os
 import sys
 from pathlib import Path
 import scipy.io as spio
+import numpy as np
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from modules.elbo import ELBO
