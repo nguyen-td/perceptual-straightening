@@ -96,7 +96,7 @@ class ELBO(nn.Module):
         l_post: (n_iterations, ) Torch tensor
             Updates of mu_post_l over iterations
         c_est: (n_samples x n_frames - 2) Torch tensor
-            Estimated curvature vector from generated trajectory; can be used to check if the estimated curvature is the same as the ground truth curvature used to generate the trajectory
+            Estimated curvature (in radians) vector from generated trajectory; can be used to check if the estimated curvature is the same as the ground truth curvature used to generate the trajectory
         """
 
         # run MLE to initialize posterior distribution

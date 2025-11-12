@@ -36,7 +36,7 @@ for item in data:
         _, _, _, _, _, _, _, _, _, _, _, c_est = elbo.optimize_ELBO_SGD()
 
         curvatures[0, 0] = torch.rad2deg(torch.mean(c_est)).detach().numpy() 
-        curvatures[0, 1] = np.rad2deg(c_true)
+        curvatures[0, 1] = c_true
 
         # save file
         n_reps = S_list[sim_idx]['generative_params'][0, 0]['n_reps'][0,0]
