@@ -4,10 +4,6 @@ from pathlib import Path
 import scipy.io as spio
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from modules import compute_curvature_pixel
-import numpy as np
-import imageio.v2 as imageio 
-import matplotlib.pyplot as plt
 from modules.elbo import ELBO
 
 # load sample trajectory
