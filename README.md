@@ -25,9 +25,9 @@ import modules.elbo import ELBO
 # Load data
 n_corr_obs = ...  # (n_frames x n_frames) Matrix (NumPy array) where each entry corresponds to the number of correct observations/trials in the AXB task
 n_total_obs = ... # (n_frames x n_frames) Matrix (NumPy array) where each entry corresponds to the number of total observations/trials in the AXB task
-n_dim = ...       # Dimensionality of the perceptual (d') space where the trajectory lives in
 
 # Run inference
+n_dim = ...        # Dimensionality of the perceptual (d') space where the trajectory lives in
 n_starts = ...     # number of starts for the multistart procedure for initialization
 n_iterations = ... # number of maximal inference iterations for parameter convergence
 
