@@ -10,7 +10,7 @@ from modules.elbo import ELBO
 # load sample trajectory
 sim_idx = 0 # which out of the 100 trajectories to use
 data_path = Path('data') / 'sim'
-f_name = 'sim_0125.mat'
+f_name = 'sim_0090.mat'
 S = spio.loadmat(Path(data_path) / f_name)['S']
 S_list = [S[0, i] for i in range(S.shape[1])]  # convert to list of structs
 

@@ -21,7 +21,7 @@ for item in data:
     S_list = [S[0, i] for i in range(S.shape[1])]  # convert to list of structs
 
     # unpack data
-    curvatures = np.zeros((len(S_list), 2))
+    curvatures = np.zeros((1, 2))
     sim_idx = 0
     print(item)
     try:
@@ -35,8 +35,8 @@ for item in data:
         elbo = ELBO(n_dim, n_corr_obs, n_total_obs, n_starts=10, n_iterations=40000)
         _, _, _, _, _, _, _, _, _, _, _, c_est = elbo.optimize_ELBO_SGD()
 
-        curvatures[sim_idx, 0] = torch.rad2deg(torch.mean(c_est)).detach().numpy() 
-        curvatures[sim_idx, 1] = np.rad2deg(c_true)
+        curvatures[0, 0] = torch.rad2deg(torch.mean(c_est)).detach().numpy() 
+        curvatures[0, 1] = np.rad2deg(c_true)
 
         # save file
         n_reps = S_list[sim_idx]['generative_params'][0, 0]['n_reps'][0,0]

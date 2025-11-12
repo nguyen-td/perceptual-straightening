@@ -15,7 +15,12 @@ class ELBO(nn.Module):
     
     The following only holds for a posterior that is *NOT* implemented within the mean-field approximation framework:
 
-    The prior will contain global trajectory variables (one value for each variable: d*, c*, a*, l*), whereas the variational distribution will contain the local trajectory variables, i.e., a set of local variables for each node (or for N-1 or N-2 nodes, respectively: d(t), d(t+1)..., c(t), c(t+1), ..., a(t), a(t+1), ..., l). To match the dimension for computing the KL-divergence term, the prior will still have the same dimensions but with repeating values. For example, the variational distribution has N-1 values for the local 'd' parameter, the prior distribution has N-1 times the *same*  value for the 'd' parameter. 
+    The prior will contain global trajectory variables (one value for each variable: d*, c*, a*, l*), 
+    whereas the variational distribution will contain the local trajectory variables, i.e., a set of 
+    local variables for each node (or for N-1 or N-2 nodes, respectively: d(t), d(t+1)..., c(t), c(t+1), ..., 
+    a(t), a(t+1), ..., l). To match the dimension for computing the KL-divergence term, the prior will still 
+    have the same dimensions but with repeating values. For example, the variational distribution has N-1 
+    values for the local 'd' parameter, the prior distribution has N-1 times the *same*  value for the 'd' parameter. 
 
     Input:
     ------
@@ -66,7 +71,7 @@ class ELBO(nn.Module):
 
     def optimize_ELBO_SGD(self):
         """
-        Runs the complete algorithm to minimize the ELBO using SGD.
+        Runs the complete algorithm to minimize the ELBO using SGD (Adam optimizer).
 
         Outputs:
         --------
