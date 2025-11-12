@@ -17,6 +17,18 @@ The last reference is a well-written and useful review of the framework that is 
 - [main.ipynb](https://github.com/nguyen-td/perceptual-straightening/blob/main/main.ipynb): Estimate curvature of a single simulated trajectory and visualize the training progress.
 - [compute_perc_curvature.py](https://github.com/nguyen-td/perceptual-straightening/blob/main/tests/compute_perc_curvature.py): Same as above but more condensed as a Python script (.py file) without visualization.
 
+The logic for perceptual curvature estimation is as follows:
+
+```python
+# Load data
+n_corr_obs = ...  # (n_frames x n_frames) Matrix (NumPy array) where each entry corresponds to the number of correct observations/trials in the AXB task
+n_total_obs = ... # (n_frames x n_frames) Matrix (NumPy array) where each entry corresponds to the number of total observations/trials in the AXB task
+n_dim = ...       # Dimensionality of the perceptual (d') space where the trajectory lives in
+
+
+
+```
+
 # Repository structure
 After cloning or forking this repository, your project layout should look as follows:
 ```
@@ -35,8 +47,19 @@ perceptual-straightening
 
 `utils` contains some other small useful functions called from other functions.
 
-# Current implementation
-In the variational Bayesian inference framework, the goal is to numerically approximate an intractible posterior $p(z | x)$ with a variational one $q_{\phi}(z)$ (or $q_{\phi}(z | x)$ if it depends on data), where $x$ corresponds to the data and $z$ to the potentially high-dimensional latent (or hidden) variable over which to marginalize (cf. [1,3]). Let $(m,n)$ be the data containing the number of correct and incorrect responses in the AXB task, then the goal is to maximize the probability of observing these responses $p_{\theta}(n,m)$, parameterized by a set of parameters $\theta$ (corresponding to the global trajectory parameters). This probability is approximated by the evidence lower bound (ELBO): 
+# Logic behind the implementation
+Direct curvature estimation amounts to maximizing the likelihood of the parameters, $\theta = \left(d^\*, c^\*, \sigma_d, \sigma_c, \Sigma_a \right)$ governing the random variables $z = \left(z_t^d, z_t^c, z_t^a, z^{\lambda} \right),$ that best account for the data. That is,
+
+$$
+\theta^* = argmax_{\theta} \\ p(z \mid n, m) = argmax_{\theta} \\ \frac{p(n,m \mid z) p_{\theta}(z)}{p(n,m)}
+$$
+
+In the variational Bayesian inference framework, the goal is to numerically approximate the intractible evidence 
+
+$$
+log = p_{\theta}(n,m) = log \\ \int p(n,m \mid z) \ p_{\theta}(z) \ dz$$ 
+
+by introducing a variational posterior $q_{\phi}(z | n,m)$ (cf. [1,3]), where $(m,n)$ is the data containing the number of correct and incorrect responses in the AXB task. This probability is approximated by the evidence lower bound (ELBO): 
 
 $$
 log p_{\theta}(n,m) \geq \mathbb{E}_{q\_{\phi}(z|n,m)}[log p(n,m | z)] - D\_{KL} \left( q\_{\phi}(z | n,m) \ \rVert \ p\_{\theta}(z) \right)
