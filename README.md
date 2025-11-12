@@ -8,16 +8,7 @@ This repository contains code for the perceptual curvature estimation algorithm 
 >
 > [3] Blei, D. M., Kucukelbir, A., & McAuliffe, J. D. (2017). Variational inference: A review for statisticians. Journal of the American statistical Association, 112(518), 859-877.
 
-The last reference is a very well-written and useful review of the framework that is being used.
-
-The code is tested on simulated trajectories where the ground truth curvature is known. The quality of the estimation is tested by performing recovery analyses (cf. supplementary figure in [1]). That is, the estimated curvature should be the same (or approximately the same) as the true curvature across the whole range of curvatures, i.e., from 0 to $\frac{\pi}{2}$). The figure below shows a biased estimation (a) and an unbiased, desired estimation (b). Panel a) is the result of the greedy, two-step direct estimation. Panel b) shows the results of the most likely perceptual curvature given many plausible perceptual trajectories, i.e., the method to re-implement.
-
-<p float="middle">
-  <img src="https://github.com/nguyen-td/perceptual-straightening/blob/main/res/recovery_analysis.png?raw=true"/>     
-  &nbsp; &nbsp;
-</p>
-
-📌 Running the code might require the [MATLAB Engine API for Python](https://www.mathworks.com/help/matlab/matlab_external/install-the-matlab-engine-for-python.html), which itself requires the most updated version of MATLAB. We use this to call a MATLAB function directly from Python without the need to translate MATLAB code into Python explicitely. 
+The last reference is a well-written and useful review of the framework that is being used.
 
 💡The original Lua implementation can be found here: [Olivier Hénaff's repository](https://github.com/olivierhenaff/perceptual-straightening/tree/master). 
 
