@@ -31,10 +31,7 @@ def run_bootstrap(iboot, n_dim, n_corr_obs, n_total_obs, n_starts, n_iterations,
 
         # replace perceptual curvature with pixel-domain curvature
         is_natural = True if category == 'natural' else False
-        x_null, c_est_null, p_null = construct_null_trajectory(
-            stim_folder, n_dim, elbo._transform(elbo.mu_post_d, 'd'),
-            elbo.mu_post_a, is_natural, n_frames
-        )
+        x_null, c_est_null, p_null = construct_null_trajectory(stim_folder, n_dim, elbo._transform(elbo.mu_post_d, 'd'), elbo.mu_post_a, is_natural, n_frames)
 
         # synthesize data from null observer
         prop_corr_null_sim, n_total_obs_null_sim = forward_simulation(x_null.detach().squeeze(), n_reps, var=1)
