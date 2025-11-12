@@ -3,7 +3,7 @@ import numpy as np
 
 def orthogonalize_acc(a, v_hat):
     """
-    Function to orthogonalize the acceleration w.r.t. the previous displacement vector, s.t. a(t) ⊥ v(t-1).
+    Function to orthogonalize the acceleration w.r.t. the previous displacement vector, s.t. a(t) ⊥ v(t-1) via vector projection.
 
     Inputs:
     -------
