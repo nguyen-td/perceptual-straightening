@@ -20,12 +20,19 @@ The last reference is a well-written and useful review of the framework that is 
 The logic for perceptual curvature estimation is as follows:
 
 ```python
+import modules.elbo import ELBO
+
 # Load data
 n_corr_obs = ...  # (n_frames x n_frames) Matrix (NumPy array) where each entry corresponds to the number of correct observations/trials in the AXB task
 n_total_obs = ... # (n_frames x n_frames) Matrix (NumPy array) where each entry corresponds to the number of total observations/trials in the AXB task
 n_dim = ...       # Dimensionality of the perceptual (d') space where the trajectory lives in
 
+# Run inference
+n_starts = ...     # number of starts for the multistart procedure for initialization
+n_iterations = ... # number of maximal inference iterations for parameter convergence
 
+elbo = ELBO(n_dim, n_corr_obs, n_total_obs, n_starts=n_starts, n_iterations=n_iterations)
+_, _, _, _, _, _, _, _, _, _, _, c_est = elbo.optimize_ELBO_SGD() # c_est contains the estimated curvatures in degrees
 
 ```
 
@@ -47,7 +54,7 @@ perceptual-straightening
 
 `utils` contains some other small useful functions called from other functions.
 
-# Logic behind the implementation
+# Variational inference
 Direct curvature estimation amounts to maximizing the likelihood of the parameters, $\theta = \left(d^\*, c^\*, \sigma_d, \sigma_c, \Sigma_a \right)$ governing the random variables $z = \left(z_t^d, z_t^c, z_t^a, z^{\lambda} \right),$ that best account for the data. That is,
 
 $$
