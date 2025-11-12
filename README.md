@@ -17,7 +17,7 @@ The last reference is a well-written and useful review of the framework that is 
 - [main.ipynb](https://github.com/nguyen-td/perceptual-straightening/blob/main/main.ipynb): Estimate curvature of a single simulated trajectory and visualize the training progress.
 - [compute_perc_curvature.py](https://github.com/nguyen-td/perceptual-straightening/blob/main/tests/compute_perc_curvature.py): Same as above but more condensed as a Python script (.py file) without visualization.
 
-The logic for perceptual curvature estimation is as follows:
+Here is a skeleton for a generic curvature estimation task:
 
 ```python
 import modules.elbo import ELBO
