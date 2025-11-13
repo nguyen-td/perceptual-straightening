@@ -48,7 +48,7 @@ perceptual-straightening
 └── /.../ 					
 ```
 
-`modules/` contains the main chunk of the low-level code. `elbo.py` contains the low-level code of the hierarchical algorithm, `recovery_analysis.py` contains code for the recovery analysis, both for the direct estimation and the advanced, unbiased estimation, though it does not work as intended yet. 
+`modules/` contains the main chunk of the low-level code. `elbo.py` contains the low-level code of the hierarchical algorithm.
 
 `simulations` contains MATLAB code to simulate perceptual trajectories. `simulation.m` is a standalone function to simulate one trajectory --- used in `generate_trajectories.m` to create a dataset of trajectories.
 
