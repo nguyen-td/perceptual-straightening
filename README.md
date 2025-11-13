@@ -28,7 +28,6 @@ n_total_obs = ... # (n_frames x n_frames) Matrix (NumPy array) where each entry 
 
 # Run inference
 n_dim = ...        # Dimensionality of the perceptual (d') space where the trajectory lives in
-
 elbo = ELBO(n_dim, n_corr_obs, n_total_obs, n_starts=n_starts, n_iterations=n_iterations)
 _, _, _, _, _, _, _, _, _, _, _, c_est = elbo.optimize_ELBO_SGD() # c_est contains the estimated curvatures in degrees
 
