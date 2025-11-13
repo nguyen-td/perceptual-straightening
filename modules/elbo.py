@@ -24,25 +24,23 @@ class ELBO(nn.Module):
 
     Input:
     ------
-    n_frames: Scalar
-        Number of nodes/frames
     n_dim: Scalar
         Number of dimensions
     n_corr_obs: (n_frames x n_frames) Numpy array
         Matrix where each entry corresponds to the number of correct observations/choices for the respective frame combination
     n_total_obs: (n_frames x n_frames) Numpy array
         Matrix where each entry corresponds to the number of completed trials for the respective frame combination
-    lr: Scalar
+    lr: Scalar (default: 1e-4)
         Learning rate for optimization algorithm
-    n_iterations: Scalar
+    n_iterations: Scalar (default: 40000)
         Number of iterations for optimization
-    n_starts: Scalar
-        Number of multistarts of the maximum likelihood estimation for initializing the posterior distributions
-    n_samples: Scalar
+    n_starts: Scalar (default: 10)
+        Number of multistarts of the maximum likelihood estimation for initializing the posterior distributions. Default: 10
+    n_samples: Scalar (default: 100)
         Number of trajectories to sample to compute the expected value (in ELBO)
     eps: Scalar (default: 1e-6)
         Regularization factor to ensure numerical stability for computing the Cholesky decomposition
-    verbose: Boolean
+    verbose: Boolean (default: True)
         If True, outputs progress bar.
     """
     
@@ -51,7 +49,7 @@ class ELBO(nn.Module):
                  n_corr_obs,
                  n_total_obs,
                  lr=1e-4,
-                 n_iterations=20000,
+                 n_iterations=40000,
                  n_starts=10,
                  n_samples=100,
                  eps=1e-6,
@@ -82,7 +80,7 @@ class ELBO(nn.Module):
         errors: (n_iterations, ) Torch tensor
             ELBO loss over iterations
         kl_loss: (n_iterations, ) Torch tensor
-            KL-divergence over iterations
+            KL-divergence over iterations. 
         c_prior: (n_iterations, ) Torch tensor
             Updates of mu_prior_c over iterations
         d_prior: (n_iterations, ) Torch tensor
