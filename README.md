@@ -53,7 +53,7 @@ perceptual-straightening
 `utils` contains some other small useful functions called from other functions.
 
 # Variational inference
-Direct curvature estimation amounts to maximizing the likelihood of the parameters, $\theta = \left(d^\*, c^\*, \sigma_d, \sigma_c, \Sigma_a \right)$ governing the random variables $z = \left(z_t^d, z_t^c, z_t^a, z^{\lambda} \right),$ that best account for the data. That is,
+Direct curvature estimation amounts to maximizing the likelihood of the parameters, $\boldsymbol{\theta} = \left(d^\*, c^\*, \sigma_d, \sigma_c, \Sigma_a \right)$ governing the random variables $z = \left(z_t^d, z_t^c, z_t^a, z^{\lambda} \right),$ that best account for the data. That is,
 
 $$
 \theta^* = argmax_{\theta} \\ p(z \mid n, m) = argmax_{\theta} \\ \frac{p(n,m \mid z) p_{\theta}(z)}{p(n,m)}
@@ -85,8 +85,6 @@ $$
 7. Return to Step 1 until convergence.
 
 ## Choice of the prior and posterior
-To avoid ambiguity, vectors and matrices are now denoted using **bold** letters.
-
 Both the prior and posterior are chosen to follow a Gaussian distribution. As such, we have a prior $p_{\boldsymbol{\theta}}(\boldsymbol{z}) = \mathcal{N}(\boldsymbol{\mu}, \boldsymbol{\Sigma})$, where $\boldsymbol{\mu} = \left(\mu_{d^\*}, \mu_{c^\*}, \mu_{\boldsymbol{a}^\*}, \mu_{\lambda^\*}\right)^T$ (note that $\boldsymbol{a}$ is a vector) and 
 
 $$\boldsymbol{\Sigma} = \begin{bmatrix}
@@ -96,7 +94,7 @@ $$\boldsymbol{\Sigma} = \begin{bmatrix}
 0   & 0   & 0   & \sigma_{\lambda^\*}
 \end{bmatrix}.$$
 
-Please refer to the current code for which values are currently used for the initialization. Here, $\boldsymbol{\theta}$ referes to all *learnable* parameters, which can be specified. For example, in [1], only $\boldsymbol{\theta} = \left(\mu_{d^\*}, \mu_{c^*\}, \sigma_{d^\*}, \sigma_{c^\*}, \boldsymbol{\Sigma_{a}^\*}\right)$ were chosen to be learnable. A learnable parameter can be specified by setting `requires_grad=True`. The prior shapes the *global* parameters, i.e., the global distance, the global curvature etc.
+Here, $\boldsymbol{\theta}$ referes to all *learnable* parameters, which can be specified. For example, in [1], only $\boldsymbol{\theta} = \left(\mu_{d^\*}, \mu_{c^*\}, \sigma_{d^\*}, \sigma_{c^\*}, \boldsymbol{\Sigma_{a}^\*}\right)$ were chosen to be learnable. A learnable parameter can be specified by setting `requires_grad=True`. The prior shapes the *global* parameters, i.e., the global distance, the global curvature etc.
 
 The posterior shapes the *local* parameters, i.e., we have one posterior distribution for each node $T$ with variables that are defined over the following spaces:
 
