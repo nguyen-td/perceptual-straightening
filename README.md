@@ -64,7 +64,7 @@ $$
 In the variational Bayesian inference framework, the goal is to numerically approximate the intractible evidence 
 
 $$
-log p_{\theta}(n,m) = log \\ \int p(n,m \mid z) \ p_{\theta}(z) \ dz
+log p_{\theta}(n,m) = log \\ \int p(n,m \mid z) \ p_{\theta}(z) \ dz.
 $$ 
 
 by introducing a variational posterior $q_{\phi}(z | n,m)$ (cf. [1,3]), where $(m,n)$ is the data containing the number of correct and incorrect responses in the AXB task. This probability is approximated by the evidence lower bound (ELBO): 
