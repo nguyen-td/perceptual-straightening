@@ -53,33 +53,33 @@ perceptual-straightening
 `utils` contains some other small useful functions called from other functions.
 
 # Variational inference
-Direct curvature estimation amounts to maximizing the likelihood of the parameters, $\boldsymbol{\theta} = \left(d^\*, c^\*, \sigma_d, \sigma_c, \Sigma_a \right)$ governing the random variables $z = \left(z_t^d, z_t^c, z_t^a, z^{\lambda} \right),$ that best account for the data. That is,
+Direct curvature estimation amounts to maximizing the likelihood of the parameters, $\boldsymbol{\theta} = \left(d^\*, c^\*, \sigma_d, \sigma_c, \Sigma_a \right)$ governing the random variables $\boldsymbol{z} = \left(z_t^d, z_t^c, z_t^a, z^{\lambda} \right),$ that best account for the data. That is,
 
 $$
-\theta^* = argmax_{\theta} \\ p(z \mid n, m) = argmax_{\theta} \\ \frac{p(n,m \mid z) p_{\theta}(z)}{p(n,m)}
+\boldsymbol{\theta^*} = argmax_{\boldsymbol{\theta}} \\ p(\boldsymbol{z} \mid \boldsymbol{n, m}) = argmax_{\boldsymbol{\theta}} \\ \frac{p(\boldsymbol{n,m} \mid \boldsymbol{z}) p_{\boldsymbol{\theta}}(\boldsymbol{z})}{p(\boldsymbol{n,m})}
 $$
 
 In the variational Bayesian inference framework, the goal is to numerically approximate the intractible evidence 
 
 $$
-log p_{\theta}(n,m) = log \\ \int p(n,m \mid z) \ p_{\theta}(z) \ dz.
+log p_{\boldsymbol{\theta}}(\boldsymbol{n,m}) = log \\ \int p(\boldsymbol{n,m} \mid \boldsymbol{z}) \ p_{\boldsymbol{\theta}}(\boldsymbol{z}) \ d\boldsymbol{z}.
 $$ 
 
-by introducing a variational posterior $q_{\phi}(z | n,m)$ (cf. [1,3]), where $(m,n)$ is the data containing the number of correct and incorrect responses in the AXB task. This probability is approximated by the evidence lower bound (ELBO): 
+by introducing a variational posterior $q_{\phi}(\boldsymbol{z} | \boldsymbol{n,m})$ (cf. [1,3]), where $(\boldsymbol{m,n})$ is the data containing the number of correct and incorrect responses in the AXB task. This probability is approximated by the evidence lower bound (ELBO): 
 
 $$
-log p_{\theta}(n,m) \geq \mathbb{E}_{q\_{\phi}(z|n,m)}[log p(n,m | z)] - D\_{KL} \left( q\_{\phi}(z | n,m) \ \rVert \ p\_{\theta}(z) \right)
+log p_{\boldsymbol{\theta}}(\boldsymbol{n,m}) \geq \mathbb{E}_{q\_{\boldsymbol{\phi}}(\boldsymbol{z} \mid \boldsymbol{n,m})}[log p(\boldsymbol{n,m} \mid \boldsymbol{z})] - D\_{KL} \left( q\_{\boldsymbol{\phi}}(\boldsymbol{Z} \mid \boldsymbol{n,m}) \ \rVert \ p\_{\boldsymbol{\theta}}(\boldsymbol{z}) \right)
 $$ 
 
 $$
-log p_{\theta}(n,m) \geq ELBO(q)
+log p_{\theta}(\boldsymbol{n,m)} \geq ELBO(q)
 $$ 
 
 ## Algorithm
-0. Initialize the prior $p\_{\theta}(z)$ and the variational posterior $q\_{\phi}(z | n,m)$.
+0. Initialize the prior $p\_{\boldsymbol{\theta}}(\boldsymbol{z})$ and the variational posterior $q\_{\boldsymbol{\phi}}(\boldsymbol{Z} \mid \boldsymbol{n,m})$.
 1. Compute the KL-divergence term.
-2. Sample $N$ samples from the variational posterior $z_i \sim q\_{\phi}(z | n,m), \quad i = 1, ..., N$.
-3. Use $z$, which contains information about $(d, c, a, \lambda)$, to construct the trajectory and compute the expected likelihood $\frac{1}{N} \sum_i^N log p(n,m | z_i)$. Note that, in the AXB task, the likelihood is governed by a binomial distribution $B(n_{ij},m_{ij} | p_{ij})$ describing the subject's number of correct and incorrect responses.
+2. Sample $N$ samples from the variational posterior $\boldsymbol{z_i} \sim q\_{\phi}(\boldsymbol{Z} \mid \boldsymbol{n,m}), \quad i = 1, ..., N$.
+3. Use $\boldsymbol{z}$ containing information about $(d, c, a, \lambda)$ to construct the trajectory and compute the expected likelihood $\frac{1}{N} \sum_i^N log p(\boldsymbol{n,m} \mid \boldsymbol{z_i})$. Note that, in the AXB task, the likelihood is governed by a binomial distribution $B(n_{ij},m_{ij} | p_{ij})$ describing the subject's number of correct and incorrect responses.
 5. Compute the ELBO term.
 6. Compute the gradient and update the parameters using the Adam optimizer.
 7. Return to Step 1 until convergence.
