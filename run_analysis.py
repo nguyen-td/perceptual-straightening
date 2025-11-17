@@ -1,10 +1,19 @@
-from pathlib import Path
+# ==========================================
+# LIMIT THREADS BEFORE ANY HEAVY IMPORT
+# ==========================================
 import os
-import numpy as np
-import torch
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
 
+import torch
+torch.set_num_threads(1)
+torch.set_num_interop_threads(1)
+
+import numpy as np
+from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import traceback
+
 
 # # set device (CPU or GPU)
 # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -19,6 +28,9 @@ def run_bootstrap(iboot, n_dim, n_corr_obs, n_total_obs, n_starts, n_iterations,
     import time
     from modules.elbo import ELBO
     from modules import forward_simulation, construct_null_trajectory
+
+    torch.set_num_threads(1)
+    torch.set_num_interop_threads(1)
 
     try:
         t = time.perf_counter()
@@ -124,12 +136,15 @@ for f_name in data:
             with ProcessPoolExecutor(max_workers=os.cpu_count()) as executor:
                 futures = [
                     executor.submit(
-                        run_bootstrap, iboot, n_dim, n_corr_obs, n_total_obs, n_starts, n_iterations, category, stim_folder, n_reps, n_frames)
+                        run_bootstrap, iboot, n_dim, n_corr_obs, n_total_obs, n_starts,
+                        n_iterations, category, stim_folder, n_reps, n_frames)
                     for iboot in range(n_bootstraps)
                 ]
 
                 for future in as_completed(futures):
                     iboot, c_null, c_est = future.result()
-                    curvatures[iboot, 0] = c_null
-                    curvatures[iboot, 1] = c_est
-                    np.savetxt(f_name, curvatures, delimiter=',')
+                    curvatures[iboot] = (c_null, c_est)
+
+            # Save once
+            np.savetxt(f_name, curvatures, delimiter=',')
+
