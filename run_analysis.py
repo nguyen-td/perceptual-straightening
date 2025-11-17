@@ -145,6 +145,6 @@ for f_name in data:
                     iboot, c_null, c_est = future.result()
                     curvatures[iboot] = (c_null, c_est)
 
-            # Save once
+            # save once
             np.savetxt(f_name, curvatures, delimiter=',')
 
