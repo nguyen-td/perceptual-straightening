@@ -1,27 +1,15 @@
-# ==========================================
-# LIMIT THREADS BEFORE ANY HEAVY IMPORT
-# ==========================================
-import os
-os.environ["OMP_NUM_THREADS"] = "1"
-os.environ["MKL_NUM_THREADS"] = "1"
-
-import torch
-torch.set_num_threads(1)
-torch.set_num_interop_threads(1)
-
-import numpy as np
 from pathlib import Path
+import os
+import numpy as np
+import torch
+
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import traceback
 
 
-# # set device (CPU or GPU)
-# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-# print(f'Device (CPU or GPU): ', device)
-
 def run_bootstrap(iboot, n_dim, n_corr_obs, n_total_obs, n_starts, n_iterations, category, stim_folder, n_reps, n_frames):
     """
-    Function to run one entire iterations (one bootstrap). Needs to import packages separately because each process runs in isolation.
+    Runs one bootstrap iteration for one dataset. Executed inside a separate process.
     """
     import torch
     import numpy as np
@@ -29,28 +17,40 @@ def run_bootstrap(iboot, n_dim, n_corr_obs, n_total_obs, n_starts, n_iterations,
     from modules.elbo import ELBO
     from modules import forward_simulation, construct_null_trajectory
 
-    torch.set_num_threads(1)
-    torch.set_num_interop_threads(1)
-
     try:
         t = time.perf_counter()
-        print(f"Bootstrap: {iboot}")
+        print(f"Bootstrap {iboot}: running")
 
         # run estimation on real data
-        elbo = ELBO(n_dim, n_corr_obs, n_total_obs, n_starts=n_starts, n_iterations=n_iterations, verbose=False)
+        elbo = ELBO(n_dim, n_corr_obs, n_total_obs,
+                    n_starts=n_starts, n_iterations=n_iterations,
+                    verbose=False)
+
         _, _, _, _, _, _, _, _, _, _, _, c_est = elbo.optimize_ELBO_SGD()
         c_est_val = torch.rad2deg(torch.mean(c_est)).detach().numpy()
 
         # replace perceptual curvature with pixel-domain curvature
         is_natural = True if category == 'natural' else False
-        x_null, c_est_null, p_null = construct_null_trajectory(stim_folder, n_dim, elbo._transform(elbo.mu_post_d, 'd'), elbo.mu_post_a, is_natural, n_frames)
+
+        x_null, c_est_null, p_null = construct_null_trajectory(
+            stim_folder,
+            n_dim,
+            elbo._transform(elbo.mu_post_d, 'd'),
+            elbo.mu_post_a,
+            is_natural,
+            n_frames
+        )
 
         # synthesize data from null observer
-        prop_corr_null_sim, n_total_obs_null_sim = forward_simulation(x_null.detach().squeeze(), n_reps, var=1)
+        prop_corr_null_sim, n_total_obs_null_sim = forward_simulation(
+            x_null.detach().squeeze(), n_reps, var=1
+        )
         n_corr_obs_null = np.round(n_total_obs_null_sim * prop_corr_null_sim)
 
         # compute null model
-        elbo_null = ELBO(n_dim, n_corr_obs_null, n_total_obs_null_sim, n_starts=n_starts, n_iterations=n_iterations, verbose=False)
+        elbo_null = ELBO(n_dim, n_corr_obs_null, n_total_obs_null_sim,
+                         n_starts=n_starts, n_iterations=n_iterations,
+                         verbose=False)
         _, _, _, _, _, _, _, _, _, _, _, c_est_null = elbo_null.optimize_ELBO_SGD()
         c_est_null_val = torch.rad2deg(torch.mean(c_est_null)).detach().numpy()
 
@@ -65,86 +65,86 @@ def run_bootstrap(iboot, n_dim, n_corr_obs, n_total_obs, n_starts, n_iterations,
         return iboot, np.nan, np.nan
 
 
-f_path = Path('data') / 'behavioral_data_09052025' / 'pt'
-data = sorted(os.listdir(f_path))
+if __name__ == "__main__":
+    import multiprocessing
+    multiprocessing.freeze_support()
+    torch.set_num_threads(1)
+    torch.set_num_interop_threads(1)
 
-# for isubj in range(10, len(df)):
-for f_name in data:
-    if f_name.endswith('.pt'):
+    f_path = Path('data') / 'behavioral_data_09052025' / 'pt'
+    data_files = sorted(os.listdir(f_path))
 
-        subject = f_name.split('_')[0]
-        category = f_name.split('_')[1]
-        eccentricity = f_name.split('_')[2]
-        movie_id = int(f_name.split('_')[3])
-        dat_movie_name = f_name.split('_')[4].split('.')[0]
+    # global optimization settings
+    n_bootstraps = 1
+    n_iterations = 1
+    n_reps = 10
+    n_starts = 10
 
-        match eccentricity:
-            case 'fovea':
-                diameter = 6
-            case 'parafovea':
-                diameter = 24
-            case _:
-                diameter = 36
-        match dat_movie_name:
-            case 'DAM':
-                stim_movie_name = 'carnegie-dam'
-            case 'PRAIRIE':
-                stim_movie_name = 'prairie1'
-            case 'EGOMOTION':
-                stim_movie_name = 'egomotion'
-            case _:
-                continue
+    # prepare output directory
+    save_dir = Path('data') / 'yoon_results_unanalyzed'
+    save_dir.mkdir(parents=True, exist_ok=True)
 
-        # file where data will be stored
-        save_path = Path('data') / 'yoon_results_unanalyzed'
-        save_path.mkdir(parents=True, exist_ok=True)
-        f_name = Path(save_path) / f'curvatures_{subject}_{category}_{eccentricity}_{movie_id:02d}_{dat_movie_name}.csv'
+    for iboot in range(n_bootstraps):
+        futures = {}
 
-        # optimization settings
-        n_bootstraps = 100
-        n_iterations = 40000
-        n_reps = 10
-        n_starts = 10 # multistarts for MLE, used for initializing posterior of the hierarchical variational inference algorithm
+        with ProcessPoolExecutor(max_workers=os.cpu_count()) as executor:
+            for f_name in data_files:
 
-        # load data
-        dat = torch.load(Path(f_path) / f'{subject}_{category}_{eccentricity}_{movie_id:02d}_{dat_movie_name}.pt')
-        stim_folder = os.path.join('data', 'yoon_stimulus', f'diameter_{diameter:02d}_deg', f'movie{movie_id:02d}-{stim_movie_name}')
+                if not f_name.endswith('.pt'):
+                    continue
 
-        # create trial matrices
-        n_frames = min(max(dat[:, 1]), max(dat[:, 2]))
-        n_trials = len(dat[:, 0])
-        n_dim = n_frames - 1
+                subject, category, eccentricity, movie_id_str, dat_movie_name_ext = f_name.split('_')
+                movie_id = int(movie_id_str)
+                dat_movie_name = dat_movie_name_ext.split('.')[0]
 
-        n_total_obs = np.zeros((n_frames, n_frames))
-        n_corr_obs = np.zeros((n_frames, n_frames))
+                # eccentricity → diameter
+                match eccentricity:
+                    case 'fovea': diameter = 6
+                    case 'parafovea': diameter = 24
+                    case _: diameter = 36
 
-        for itrial in range(n_trials):
-            a_frame = dat[itrial, 1]
-            b_frame = dat[itrial, 2]
-            true_frame = a_frame if dat[itrial, 5] == 1 else b_frame
-            pred_frame = a_frame if dat[itrial, 6] == 1 else b_frame
+                # movie name mapping
+                match dat_movie_name:
+                    case 'DAM': stim_movie_name = 'carnegie-dam'
+                    case 'PRAIRIE': stim_movie_name = 'prairie1'
+                    case 'EGOMOTION': stim_movie_name = 'egomotion'
+                    case _: continue  # skip unknown movies
 
-            n_total_obs[a_frame-1, b_frame-1] += 1
-            n_corr_obs[a_frame-1, b_frame-1] += 1 if true_frame == pred_frame else 0
+                out_csv = save_dir / f"curvatures_{subject}_{category}_{eccentricity}_{movie_id:02d}_{dat_movie_name}.csv"
 
-        if __name__ == "__main__":
-            import multiprocessing
-            multiprocessing.freeze_support()  
+                dat = torch.load(Path(f_path) / f_name)
 
-            curvatures = np.zeros((n_bootstraps, 2)) # 1st column: c_null, 2nd colum: c_est; both columns are independent of each other and the order within columns does not matter
+                stim_folder = os.path.join('data', 'yoon_stimulus', f'diameter_{diameter:02d}_deg', f'movie{movie_id:02d}-{stim_movie_name}')
 
-            with ProcessPoolExecutor(max_workers=os.cpu_count()) as executor:
-                futures = [
-                    executor.submit(
-                        run_bootstrap, iboot, n_dim, n_corr_obs, n_total_obs, n_starts,
-                        n_iterations, category, stim_folder, n_reps, n_frames)
-                    for iboot in range(n_bootstraps)
-                ]
+                # create trial matrices
+                n_frames = min(int(dat[:, 1].max()), int(dat[:, 2].max()))
+                n_trials = dat.shape[0]
+                n_dim = n_frames - 1
 
-                for future in as_completed(futures):
-                    iboot, c_null, c_est = future.result()
-                    curvatures[iboot] = (c_null, c_est)
+                n_total_obs = np.zeros((n_frames, n_frames))
+                n_corr_obs = np.zeros((n_frames, n_frames))
 
-            # save once
-            np.savetxt(f_name, curvatures, delimiter=',')
+                for i in range(n_trials):
+                    a = int(dat[i, 1])
+                    b = int(dat[i, 2])
+                    true_frame = a if dat[i, 5] == 1 else b
+                    pred_frame = a if dat[i, 6] == 1 else b
 
+                    n_total_obs[a - 1, b - 1] += 1
+                    n_corr_obs[a - 1, b - 1] += (true_frame == pred_frame)
+
+                # schedule this dataset for bootstrap iteration
+                fut = executor.submit(
+                    run_bootstrap, iboot, n_dim, n_corr_obs, n_total_obs, n_starts, n_iterations, category, stim_folder, n_reps, n_frames)
+                futures[fut] = out_csv
+
+            # collect result for this bootstrap
+            for future in as_completed(futures):
+                out_csv = futures[future]
+                iboot_res, c_null_val, c_est_val = future.result()
+
+                # append ONE LINE to the CSV for this dataset
+                with open(out_csv, 'a') as f:
+                    f.write(f"{c_null_val},{c_est_val}\n")
+
+        print(f"Bootstrap {iboot} completed for all datasets.\n")
