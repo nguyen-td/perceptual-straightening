@@ -68,8 +68,6 @@ def run_bootstrap(iboot, n_dim, n_corr_obs, n_total_obs, n_starts, n_iterations,
 if __name__ == "__main__":
     import multiprocessing
     multiprocessing.freeze_support()
-    torch.set_num_threads(1)
-    torch.set_num_interop_threads(1)
 
     f_path = Path('data') / 'behavioral_data_09052025' / 'pt'
     data_files = sorted(os.listdir(f_path))
