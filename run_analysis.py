@@ -75,8 +75,8 @@ if __name__ == "__main__":
     data_files = sorted(os.listdir(f_path))
 
     # global optimization settings
-    n_bootstraps = 1
-    n_iterations = 1
+    n_bootstraps = 100
+    n_iterations = 40000
     n_reps = 10
     n_starts = 10
 
