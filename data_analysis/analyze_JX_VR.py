@@ -24,6 +24,8 @@ n_bootstraps = 10
 
 # run inference
 for i in range(n_bootstraps):
+    print('-----------------------------------')
+    print(f'Bootstrap: {i+1}')
     try:
         elbo = ELBO(n_dim, n_corr_obs, n_total_obs, n_starts=10, n_iterations=40000)
         _, _, _, _, _, _, _, _, _, _, _, c_est = elbo.optimize_ELBO_SGD()
