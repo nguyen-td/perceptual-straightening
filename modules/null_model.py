@@ -8,7 +8,7 @@ from scipy.optimize import minimize
 
 from modules import compute_trajectory_perceptual, compute_curvature_pixel, optimize_MLE, ELBO
 
-def optimize_null(stim_folder, n_corr_obs, n_total_obs, n_dim, n_starts=10, n_iter=1000, n_frames=11, is_natural=True, version=1, disp=False):
+def optimize_null(stim_folder, n_corr_obs, n_total_obs, n_dim, n_starts=10, n_iter=1000, n_frames=11, is_natural=True, version=1, disp=False, c_pixel=None):
     """
     Compute null model where discriminabilities (i.e. perceptual distances) are the identical to those of the human observer and where curvatures are matched to pixel-domain curvatures. 
     
@@ -49,7 +49,6 @@ def optimize_null(stim_folder, n_corr_obs, n_total_obs, n_dim, n_starts=10, n_it
     """
 
     im_category = 'natural' if is_natural else 'synthetic'
-    prob_corr = np.divide(n_corr_obs, n_total_obs, out=np.zeros_like(n_corr_obs), where=n_total_obs!=0)
 
     # load videos 
     im = []
@@ -67,6 +66,8 @@ def optimize_null(stim_folder, n_corr_obs, n_total_obs, n_dim, n_starts=10, n_it
 
     # compute pixel-domain curvature
     c_pixel = torch.tensor(compute_curvature_pixel(I)).unsqueeze(0)
+
+    prob_corr = np.divide(n_corr_obs, n_total_obs, out=np.zeros_like(n_corr_obs), where=n_total_obs!=0)
 
     if version == 1:
         x, c_est, prob_est = optimize_MLE(n_dim, n_corr_obs, n_total_obs, n_iter, n_starts=n_starts, c_pixel=c_pixel, disp=disp)
@@ -138,7 +139,7 @@ def optimize_null(stim_folder, n_corr_obs, n_total_obs, n_dim, n_starts=10, n_it
 
     return x, c_pixel, c_est, prob_corr, np.squeeze(prob_est)
 
-def construct_null_trajectory(stim_folder, n_dim, d_perc, a_perc, is_natural=True, n_frames=11):
+def construct_null_trajectory(stim_folder, n_dim, d_perc, a_perc, is_natural=True, n_frames=11, c_pixel=None):
     """
     Construct a null trajectory by taking a most likely trajectory, estimated from human data, and 
     replace its curvatures with pixel-domain curvatures.
@@ -157,6 +158,8 @@ def construct_null_trajectory(stim_folder, n_dim, d_perc, a_perc, is_natural=Tru
         Number of frames. Default is 11.
     is_natural: Boolean
         Whether the stimulus is natural (True) or synthetic (False). Default is True.
+    c_pixel: (n_samples x n_frames - 2) Torch tensor
+        Pixel curvature. Default is None. If None, pixel curvature is being estimated from stim_folder.
 
     Output:
     -------
@@ -171,21 +174,22 @@ def construct_null_trajectory(stim_folder, n_dim, d_perc, a_perc, is_natural=Tru
     im_category = 'natural' if is_natural else 'synthetic'
 
     # load videos 
-    im = []
-    for fname in sorted(os.listdir(stim_folder)):
-        if not is_natural and (fname == f'natural01.png'): # first and last frames for synthetic videos are the same as for natural videos
-            im.append(imageio.imread(Path(stim_folder) / fname))
-        if im_category in fname:
-            im_path = os.path.join(stim_folder, fname)
-            im.append(imageio.imread(im_path))
-    if not is_natural:
-        im.append(imageio.imread(Path(stim_folder) / f'natural{n_frames:02d}.png')) # last frame
+    if c_pixel is None:
+        im = []
+        for fname in sorted(os.listdir(stim_folder)):
+            if not is_natural and (fname == f'natural01.png'): # first and last frames for synthetic videos are the same as for natural videos
+                im.append(imageio.imread(Path(stim_folder) / fname))
+            if im_category in fname:
+                im_path = os.path.join(stim_folder, fname)
+                im.append(imageio.imread(im_path))
+        if not is_natural:
+            im.append(imageio.imread(Path(stim_folder) / f'natural{n_frames:02d}.png')) # last frame
 
-    # convert to 3D array and normalize to [0, 1]
-    I = np.stack(im, axis=-1).astype(np.float64) / 255
+        # convert to 3D array and normalize to [0, 1]
+        I = np.stack(im, axis=-1).astype(np.float64) / 255
 
-    # compute pixel-domain curvature
-    c_pixel = torch.tensor(compute_curvature_pixel(I))
+        # compute pixel-domain curvature
+        c_pixel = torch.tensor(compute_curvature_pixel(I))
 
     # construct null trajectory
     x, _, c_est, _, _ = compute_trajectory_perceptual(1, n_frames, n_dim, d_perc.unsqueeze(0), c_pixel.unsqueeze(0), a_perc.unsqueeze(0))
