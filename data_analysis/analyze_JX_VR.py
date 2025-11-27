@@ -4,6 +4,7 @@ import numpy as np
 import os
 import sys
 import torch
+import time
 # sys.path.append(os.path.abspath(os.path.join(os.getcwd(), '..')))
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
@@ -25,11 +26,12 @@ c_pixel = torch.Tensor([113.4483, 113.4134, 113.1497, 113.3503, 115.4514, 112.61
 data_files = sorted(os.listdir(data_path))
 
 # run inference
+t = time.perf_counter()
 for i in range(n_bootstraps):
     print('-----------------------------------')
     print(f'BOOTSTRAP: {i+1}')
     for f_name in data_files:
-        out_csv = Path(save_path) / f'{f_name.split('.')[0]}.csv'
+        out_csv = Path(save_path) / f"{f_name.split('.')[0]}.csv"
         if not f_name.endswith('.mat'):
             continue
 
@@ -60,3 +62,6 @@ for i in range(n_bootstraps):
             print('Something went wrong')
         finally:
             continue
+
+elapsed = time.perf_counter() - t
+print(f"Finished in {elapsed:.2f} sec")
