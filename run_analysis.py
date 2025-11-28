@@ -79,7 +79,7 @@ if __name__ == "__main__":
     n_starts = 10
 
     # prepare output directory
-    save_dir = Path('data') / 'yoon_results_unanalyzed'
+    save_dir = Path('data') / 'YB_results_unanalyzed'
     save_dir.mkdir(parents=True, exist_ok=True)
 
     for iboot in range(n_bootstraps):
@@ -112,7 +112,7 @@ if __name__ == "__main__":
 
                 dat = torch.load(Path(f_path) / f_name)
 
-                stim_folder = os.path.join('data', 'yoon_stimulus', f'diameter_{diameter:02d}_deg', f'movie{movie_id:02d}-{stim_movie_name}')
+                stim_folder = os.path.join('data', 'YB_stimulus_behavior', f'diameter_{diameter:02d}_deg', f'movie{movie_id:02d}-{stim_movie_name}')
 
                 # create trial matrices
                 n_frames = min(int(dat[:, 1].max()), int(dat[:, 2].max()))
