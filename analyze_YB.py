@@ -17,10 +17,10 @@ save_path = Path('data') / 'YB_results_unanalyzed'
 save_path.mkdir(parents=True, exist_ok=True)
 # out_csv = save_path / 'curvatures_pilot_JX_VR.csv'
 
-n_bootstraps = 2
+n_bootstraps = 100
 n_reps = 10
-n_starts = 1
-n_iterations = 1
+n_starts = 10
+n_iterations = 40000
 
 data_files = sorted(os.listdir(data_path))
 
