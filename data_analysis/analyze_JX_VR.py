@@ -12,7 +12,7 @@ from modules.elbo import ELBO
 from modules import forward_simulation, construct_null_trajectory
 
 # load data
-data_path = Path('data') / 'JX_VR'
+data_path = Path('data') / 'JX_data_VR'
 save_path = Path('data') / 'JX_results_VR'
 save_path.mkdir(parents=True, exist_ok=True)
 # out_csv = save_path / 'curvatures_pilot_JX_VR.csv'
