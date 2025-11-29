@@ -53,8 +53,8 @@ for iboot in range(n_bootstraps):
         
         out_csv = save_path / f"curvatures_{subject}_{category}_{eccentricity}_{movie_id:02d}_{dat_movie_name}.csv"
         dat = torch.load(Path(data_path) / f_name)
-        # stim_folder = os.path.join('data', 'YB_stimulus_behavior', f'diameter_{diameter:02d}_deg', f'movie{movie_id:02d}-{stim_movie_name}')
-        stim_folder = os.path.join('/Users', 'tn22693', 'Dropbox', 'V1V2_straightening_2024', 'psychophysics', 'perceptual_results', 'stimulus', 'experiment', f'diameter_{diameter:02d}_deg', f'movie{movie_id:02d}-{stim_movie_name}')
+        stim_folder = os.path.join('data', 'YB_stimulus_behavior', f'diameter_{diameter:02d}_deg', f'movie{movie_id:02d}-{stim_movie_name}')
+        # stim_folder = os.path.join('/Users', 'tn22693', 'Dropbox', 'V1V2_straightening_2024', 'psychophysics', 'perceptual_results', 'stimulus', 'experiment', f'diameter_{diameter:02d}_deg', f'movie{movie_id:02d}-{stim_movie_name}')
 
         # create trial matrices
         n_frames = min(int(dat[:, 1].max()), int(dat[:, 2].max()))
