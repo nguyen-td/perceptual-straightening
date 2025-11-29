@@ -75,7 +75,7 @@ for iboot in range(n_bootstraps):
 
         try:
             # run estimation on real data
-            elbo = ELBO(n_dim, n_corr_obs, n_total_obs, n_starts=n_starts, n_iterations=n_iterations, verbose=False)
+            elbo = ELBO(n_dim, n_corr_obs, n_total_obs, n_starts=n_starts, n_iterations=n_iterations, verbose=True)
             _, _, _, _, _, _, _, _, _, _, _, c_est = elbo.optimize_ELBO_SGD()
             c_est_val = torch.rad2deg(torch.mean(c_est)).detach().numpy()
 
@@ -89,7 +89,7 @@ for iboot in range(n_bootstraps):
             n_corr_obs_null = np.round(n_total_obs_null_sim * prop_corr_null_sim)
 
             # compute null model
-            elbo_null = ELBO(n_dim, n_corr_obs_null, n_total_obs_null_sim, n_starts=n_starts, n_iterations=n_iterations, verbose=False)
+            elbo_null = ELBO(n_dim, n_corr_obs_null, n_total_obs_null_sim, n_starts=n_starts, n_iterations=n_iterations, verbose=True)
             _, _, _, _, _, _, _, _, _, _, _, c_est_null = elbo_null.optimize_ELBO_SGD()
             c_est_null_val = torch.rad2deg(torch.mean(c_est_null)).detach().numpy()
 
